@@ -124,6 +124,19 @@ export function openNowFromHours(spec: string | undefined, now: Date, timeZone: 
   }
 }
 
+/** Is the venue open at a given local time today (dayOffset 0) or on a following day? null when hours are unknown. */
+export function openAtFromHours(spec: string | undefined, now: Date, timeZone: string, minutesOfDay: number, dayOffset = 0): boolean | null {
+  if (!spec) return null;
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const local = new Date(get("year"), get("month") - 1, get("day") + dayOffset, Math.floor(minutesOfDay / 60), minutesOfDay % 60);
+    return new OpeningHours(spec).getState(local);
+  } catch {
+    return null;
+  }
+}
+
 function hash(s: string): number {
   let h = 0;
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;

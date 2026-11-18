@@ -44,6 +44,30 @@ export const areaCache = pgTable("area_cache", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** "Decide together": a short-lived shortlist friends vote on via an unguessable link. */
+export const polls = pgTable("polls", {
+  id: text("id").primaryKey(), // 12-char random slug, the only way to reach the poll
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  places: jsonb("places").$type<Place[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
+export const pollVotes = pgTable(
+  "poll_votes",
+  {
+    pollId: text("poll_id")
+      .notNull()
+      .references(() => polls.id, { onDelete: "cascade" }),
+    voterId: text("voter_id").notNull(), // random per-browser id from an httpOnly cookie, not a user account
+    placeId: text("place_id").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.pollId, t.voterId] })],
+);
+
 export const conciergeRuns = pgTable(
   "concierge_runs",
   {

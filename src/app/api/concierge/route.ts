@@ -8,6 +8,9 @@ import { llmProvider } from "@/lib/llm";
 import { LlmRateLimitError } from "@/lib/llm/types";
 import { HttpError, assertSameOrigin, clientIp, handleError } from "@/lib/http";
 import { places } from "@/lib/places";
+import { openAtFromHours } from "@/lib/places/osm";
+import { getWeather, weatherHint } from "@/lib/weather";
+import { env } from "@/lib/env";
 import { anonConciergeLimiter, conciergeLimiter } from "@/lib/ratelimit";
 
 export const maxDuration = 60;
@@ -48,7 +51,10 @@ export async function POST(req: Request) {
       : [];
 
     const center = body.data.lat != null && body.data.lng != null ? { lat: body.data.lat, lng: body.data.lng } : DEFAULT_CENTER;
-    const localTime = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Kyiv", weekday: "long", hour: "2-digit", minute: "2-digit" }).format(new Date());
+    const now = new Date();
+    const localTime = new Intl.DateTimeFormat("en-GB", { timeZone: env.timeZone, weekday: "long", hour: "2-digit", minute: "2-digit" }).format(now);
+    const [hh, mm] = new Intl.DateTimeFormat("en-GB", { timeZone: env.timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now).split(":").map(Number);
+    const weather = await getWeather(center);
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -71,12 +77,15 @@ export async function POST(req: Request) {
         }, DEADLINE_MS);
         try {
           const picks = await runConcierge(
-            { prompt: body.data.prompt, center, localTime, savedNames, previous: body.data.previous },
+            { prompt: body.data.prompt, center, localTime, savedNames, previous: body.data.previous, weather: weather ? weatherHint(weather) : undefined },
             {
               llm: await provider.factory(),
               places,
               emit,
               signal: abort.signal,
+              nowMinutes: hh * 60 + mm,
+              // Hours are machine-checkable for OpenStreetMap venues; other providers return null (unknown).
+              openAt: (place, minutes, dayOffset) => (place.id.startsWith("osm_") ? openAtFromHours(place.hours.join("; "), now, env.timeZone, minutes, dayOffset) : null),
             },
           );
           if (picks && user) {

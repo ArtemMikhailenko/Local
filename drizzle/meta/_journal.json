@@ -15,6 +15,13 @@
       "when": 1795007186576,
       "tag": "0001_area_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795011809584,
+      "tag": "0002_polls",
+      "breakpoints": true
     }
   ]
 }

@@ -2,13 +2,14 @@ import { z } from "zod";
 import { distanceMeters, walkingMinutes, type LatLng } from "@/lib/geo";
 import type { LlmFactory, ToolCall, ToolResult, ToolSpec } from "@/lib/llm/types";
 import type { Place, PlacesProvider } from "@/lib/places/types";
-import { validatePicks, type Picks } from "./picks";
+import { validatePicks, validatePlan, type Picks, type Plan } from "./picks";
 
 export type ConciergeEvent =
   | { t: "status"; text: string }
   | { t: "search"; query: string; count: number }
   | { t: "inspect"; name: string }
   | { t: "result"; intro: string; picks: Array<Picks["picks"][number] & { place: Place }> }
+  | { t: "plan"; intro: string; stops: Array<Plan["stops"][number] & { place: Place; walk_min: number }> }
   | { t: "error"; message: string };
 
 export type ConciergeInput = {
@@ -16,6 +17,7 @@ export type ConciergeInput = {
   center: LatLng;
   localTime: string;
   savedNames: string[];
+  weather?: string;
   previous?: Array<{ prompt: string; picked: string[] }>;
 };
 
@@ -25,6 +27,9 @@ export type ConciergeDeps = {
   emit: (e: ConciergeEvent) => void;
   maxTurns?: number;
   signal?: AbortSignal;
+  /** Minutes since local midnight now, and an hours check for plan validation (null = unknown hours). */
+  nowMinutes?: number;
+  openAt?: (place: Place, minutesOfDay: number, dayOffset: number) => boolean | null;
 };
 
 const MAX_TOOL_USES_PER_TURN = 4;
@@ -37,7 +42,9 @@ How to work:
 - Respect hard constraints from the guest: party size, kids, budget, open now, walking distance, diet. If none fit perfectly, pick the closest options and say what is off.
 - Prefer variety (not three of the same kind) unless the guest asked for one kind.
 - Reasons must be concrete: mention rating, walking time, price, a dish or detail from the summary/reviews. No generic praise.
-- Finish by calling present_picks exactly once. Do not write the recommendations as plain text.
+- Use the weather line: when it rains or is cold, favour indoor places and short walks; when it is pleasant, terraces are a plus.
+- If the guest wants a plan for an evening, a few hours, a date or a route with several stops, build a timeline instead: 2–5 stops starting from now, realistic durations, short walks between stops, every place open at its planned time (check hours with get_place_details). Finish with present_plan.
+- Otherwise finish by calling present_picks exactly once. Never write the recommendations as plain text.
 - Write in the same language the guest used. Keep "intro" to one friendly sentence.`;
 
 export const TOOLS: ToolSpec[] = [
@@ -93,6 +100,33 @@ export const TOOLS: ToolSpec[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "present_plan",
+    description: "Return a timed plan for the evening (2-5 stops). Use instead of present_picks when the guest wants an itinerary.",
+    parameters: {
+      type: "object",
+      properties: {
+        intro: { type: "string", description: "One friendly sentence." },
+        stops: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              place_id: { type: "string" },
+              time: { type: "string", description: "Local start time, HH:MM (24h)." },
+              duration_min: { type: "integer", description: "How long to stay, 15-240." },
+              what: { type: "string", description: "Max 5 words, e.g. 'Dinner', 'Cocktails on the roof'." },
+              why: { type: "string", description: "One concrete sentence." },
+            },
+            required: ["place_id", "time", "duration_min", "what", "why"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["intro", "stops"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const SearchInput = z.object({
@@ -123,6 +157,7 @@ export function buildUserMessage(input: ConciergeInput): string {
     `Local time: ${input.localTime}`,
     `Guest location: ${input.center.lat.toFixed(4)}, ${input.center.lng.toFixed(4)}`,
   ];
+  if (input.weather) lines.push(`Weather now: ${input.weather}`);
   if (input.savedNames.length) lines.push(`Places the guest has saved before (taste signal): ${input.savedNames.slice(0, 15).join(", ")}`);
   for (const prev of input.previous ?? []) lines.push(`Earlier request: "${prev.prompt}" → suggested ${prev.picked.join(", ")}`);
   lines.push("", `Guest request: ${input.prompt}`);
@@ -150,17 +185,32 @@ export async function runConcierge(input: ConciergeInput, deps: ConciergeDeps): 
     }
 
     let final: Picks | null = null;
+    let plan: Plan | null = null;
     const results: ToolResult[] = await Promise.all(
       toolCalls.map(async (call, i) => {
         // Cost guard: a single turn may not fan out into unlimited API calls.
         const out =
           i < MAX_TOOL_USES_PER_TURN
-            ? await executeTool(call, input.center, places, seen, emit)
+            ? await executeTool(call, input.center, places, seen, emit, deps)
             : { content: `Skipped: at most ${MAX_TOOL_USES_PER_TURN} tool calls per turn.`, isError: true };
         if (out.final) final = out.final;
+        if (out.plan) plan = out.plan;
         return { id: call.id, name: call.name, content: out.content, isError: out.isError };
       }),
     );
+    if (plan) {
+      const p = plan as Plan;
+      emit({
+        t: "plan",
+        intro: p.intro,
+        stops: p.stops.map((s, i) => {
+          const place = seen.get(s.place_id)!;
+          const from = i === 0 ? input.center : seen.get(p.stops[i - 1].place_id)!.location;
+          return { ...s, place, walk_min: walkingMinutes(distanceMeters(from, place.location)) };
+        }),
+      });
+      return { intro: p.intro, picks: p.stops.map((s) => ({ place_id: s.place_id, headline: s.what, why: s.why, tip: s.time })) };
+    }
     if (final) {
       const picks = final as Picks;
       emit({ t: "result", intro: picks.intro, picks: picks.picks.map((p) => ({ ...p, place: seen.get(p.place_id)! })) });
@@ -179,7 +229,8 @@ async function executeTool(
   places: PlacesProvider,
   seen: Map<string, Place>,
   emit: (e: ConciergeEvent) => void,
-): Promise<{ content: string; isError?: boolean; final?: Picks }> {
+  deps: Pick<ConciergeDeps, "nowMinutes" | "openAt"> = {},
+): Promise<{ content: string; isError?: boolean; final?: Picks; plan?: Plan }> {
   try {
     if (tool.name === "search_places") {
       const args = SearchInput.parse(tool.input);
@@ -209,6 +260,12 @@ async function executeTool(
       const v = validatePicks(tool.input, new Set(seen.keys()));
       if (!v.ok) return { content: v.error, isError: true };
       return { content: "Delivered to the guest.", final: v.picks };
+    }
+    if (tool.name === "present_plan") {
+      const now = deps.nowMinutes ?? 18 * 60;
+      const v = validatePlan(tool.input, new Set(seen.keys()), now, (id, m, d) => (deps.openAt ? deps.openAt(seen.get(id)!, m, d) : null));
+      if (!v.ok) return { content: v.error, isError: true };
+      return { content: "Delivered to the guest.", plan: v.plan };
     }
     return { content: `Unknown tool ${tool.name}`, isError: true };
   } catch (err) {

@@ -11,8 +11,10 @@ Built as a mobile-first web app (Next.js 15, App Router). Works in any phone bro
 | **Discover** `/` | Categories, top places nearby as swipeable cards, live map with rating pins, quick concierge prompts |
 | **Search** `/search` | Debounced text search with *Open now* and price filters, recent searches, browse grid |
 | **Place** `/place/[id]` | Photo gallery, rating, walking time, open status, directions / website / call, hours (today highlighted), reviews, mini-map, "find places like this" |
-| **Concierge** `/concierge` (new feature) | Chat-style AI concierge with live progress ("Searched “wine bar” · 6 found"), 1–3 picks with reasons and insider tips, one-tap refinements ("Cheaper options", "Somewhere quieter") that keep context |
+| **Concierge** `/concierge` (new feature) | Chat-style AI concierge with live progress ("Searched “wine bar” · 6 found"), 1–3 picks with reasons and tips, or a **timed evening plan** (19:00 dinner → 21:15 bar, 6 min walk) checked against opening hours. **Voice input**, weather-aware picks, **"Let friends vote"** (shareable live poll, no account needed), walking route through all stops, one-tap refinements |
 | **Saved** `/saved` | Private list and map of saved places, profile, sign out. Sign-in / sign-up is a bottom sheet available everywhere |
+
+Also: "Surprise me" (random well-rated place open now), weather chip, recently viewed, private notes on saved places, share sheet, installable PWA.
 
 ## Run locally
 
@@ -29,9 +31,11 @@ npm run dev                    # http://localhost:3000
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Postgres connection string (Neon / Vercel Postgres in production) |
-| `ANTHROPIC_API_KEY` | for the concierge | Claude API key |
-| `GOOGLE_PLACES_API_KEY` | optional | Google Places API (New). **Without it the app runs in demo mode** on a built-in dataset of 20 fictional venues in central Kyiv, so it can be reviewed with zero setup. A "DEMO" badge is shown in the header |
-| `CONCIERGE_MODEL` | optional | Defaults to `claude-opus-5-5` |
+| `GEMINI_API_KEY` | for the concierge | Free key from aistudio.google.com. Models are auto-detected (newest Flash, falling back to Flash-Lite on quota) or set `GEMINI_MODELS` |
+| `ANTHROPIC_API_KEY` | alternative | Use Claude instead of Gemini (`CONCIERGE_MODEL`, default `claude-opus-5-5`) |
+| `GEOAPIFY_API_KEY` | recommended | Free key (no card). Fast access to OpenStreetMap venues. Without it the public Overpass API is used (first load of an area can take ~30 s, then cached in Postgres for 24 h) |
+| `GOOGLE_PLACES_API_KEY` | optional | Google Places (ratings, real photos). Takes priority when set |
+| `PLACES_PROVIDER=demo` | optional | Offline mode on 20 fictional Kyiv venues |
 
 Tests and checks:
 
@@ -63,8 +67,10 @@ tests/                 Vitest unit tests
 
 ### External API integration
 
+- **OpenStreetMap** venues (default) via Geoapify or Overpass: names, cuisine, opening hours (parsed with `opening_hours` to compute "open now" and to validate evening plans), website, phone, diet and facility tags. OSM has no photos or ratings, so cards use category photos labelled "Illustrative photo".
+- **Open-Meteo** weather (no key): shown on Discover and passed to the concierge (rain or cold → indoor places, nice → terraces).
+- **Gemini API** (default) or **Claude API** for the concierge, behind one provider-neutral interface (`src/lib/llm`).
 - **Google Places API (New)**: `places:searchText` with location bias, `openNow` and price filters; `places/{id}` for details. Field masks request only what the UI shows (cost control). Responses are normalized into one `Place` type, so the UI and the agent never see provider-specific shapes. A 10-minute in-memory cache keeps quota use low.
-- **Claude API** (`@anthropic-ai/sdk`) for the concierge, see below.
 - **OpenFreeMap** vector tiles rendered with MapLibre GL (no key needed).
 
 ### The concierge agent

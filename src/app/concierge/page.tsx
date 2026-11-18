@@ -5,16 +5,21 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { useApp } from "@/components/app-provider";
-import { IconRoute, IconSearch, IconSend, IconSparkle } from "@/components/icons";
+import { IconRoute, IconSearch, IconSend, IconSparkle, IconShare } from "@/components/icons";
+import { PlanTimeline } from "@/components/plan-timeline";
+import { VoiceButton } from "@/components/voice-button";
+import { VotePanel, createPoll, sharePoll } from "@/components/vote-panel";
 import { walkingRouteUrl } from "@/lib/route";
 import { OpenBadge, Photo, Rating, SaveButton, Walk, priceLabel } from "@/components/place-bits";
 import type { ConciergeEvent } from "@/lib/concierge/agent";
 
 type Step = { kind: "status" | "search" | "inspect"; text: string };
 type ResultEvent = Extract<ConciergeEvent, { t: "result" }>;
-type Turn = { id: number; prompt: string; steps: Step[]; result?: ResultEvent; error?: string; done: boolean };
+type PlanEvent = Extract<ConciergeEvent, { t: "plan" }>;
+type Turn = { id: number; prompt: string; steps: Step[]; result?: ResultEvent; plan?: PlanEvent; error?: string; done: boolean; pollId?: string };
 
 const SUGGESTIONS = [
+  "Plan a 4-hour date night from now, ending with a nightcap",
   "Romantic dinner for two, under $$$, walking distance",
   "We're 4 friends, want craft beer and something to eat",
   "Rainy afternoon with a 6-year-old",
@@ -31,7 +36,8 @@ function stepFrom(e: ConciergeEvent): Step | null {
 
 function ConciergeInner() {
   const params = useSearchParams();
-  const { center } = useApp();
+  const { center, toast } = useApp();
+  const pollParam = params.get("poll");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const busy = turns.some((t) => !t.done);
@@ -64,9 +70,9 @@ function ConciergeInner() {
     const id = nextId.current++;
     let finished = false;
     const previous = turns
-      .filter((t) => t.result)
+      .filter((t) => t.result || t.plan)
       .slice(-3)
-      .map((t) => ({ prompt: t.prompt, picked: t.result!.picks.map((p) => p.place.name) }));
+      .map((t) => ({ prompt: t.prompt, picked: t.result ? t.result.picks.map((p) => p.place.name) : t.plan!.stops.map((s) => s.place.name) }));
     setTurns((all) => [...all, { id, prompt: text, steps: [], done: false }]);
     setInput("");
 
@@ -94,7 +100,8 @@ function ConciergeInner() {
           const e = JSON.parse(line) as ConciergeEvent;
           const step = stepFrom(e);
           if (step) update(id, (t) => ({ ...t, steps: [...t.steps, step] }));
-          if (e.t === "result" || e.t === "error") finished = true;
+          if (e.t === "result" || e.t === "plan" || e.t === "error") finished = true;
+          if (e.t === "plan") update(id, (t) => ({ ...t, plan: e }));
           if (e.t === "result") update(id, (t) => ({ ...t, result: e }));
           if (e.t === "error") update(id, (t) => ({ ...t, error: e.message }));
         }
@@ -118,7 +125,12 @@ function ConciergeInner() {
         </div>
       </header>
 
-      {turns.length === 0 ? (
+      {pollParam && turns.length === 0 ? (
+        <section className="flex-1 px-4 py-6">
+          <VotePanel pollId={pollParam} />
+          <p className="mt-6 text-center text-[13px] text-muted">Want ideas of your own? Ask the concierge below.</p>
+        </section>
+      ) : turns.length === 0 ? (
         <section className="fade-up flex flex-1 flex-col justify-center px-5 pb-4 pt-6">
           <div className="orb orb-spin mx-auto h-16 w-16 rounded-full opacity-90 blur-[1px]" />
           <h1 className="mt-6 text-center font-display text-[40px] leading-[1]">
@@ -145,7 +157,7 @@ function ConciergeInner() {
             <div key={t.id} className="space-y-4">
               <div className="ml-auto w-fit max-w-[85%] rounded-[22px] rounded-br-md bg-accent px-4 py-2.5 text-[15px] text-black">{t.prompt}</div>
 
-              {(!t.result || !t.done) && !t.error && (
+              {((!t.result && !t.plan) || !t.done) && !t.error && (
                 <ol className="space-y-2 pl-1">
                   {t.steps.map((s, i) => (
                     <li key={i} className="fade-up flex items-center gap-2.5 text-[13px] text-muted">
@@ -165,6 +177,8 @@ function ConciergeInner() {
               )}
 
               {t.error && <div className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-[14px] text-red-200">{t.error}</div>}
+
+              {t.plan && <PlanTimeline plan={t.plan} center={center} />}
 
               {t.result && (
                 <div className="space-y-3">
@@ -216,6 +230,24 @@ function ConciergeInner() {
                       Walk them all as one evening
                     </a>
                   )}
+                  {t.done && t.result.picks.length > 1 && !t.pollId && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const pid = await createPoll(t.prompt.slice(0, 80), t.result!.picks.map((p) => p.place.id));
+                          update(t.id, (x) => ({ ...x, pollId: pid }));
+                          sharePoll(pid, t.prompt.slice(0, 80), toast);
+                        } catch {
+                          toast("Could not start a vote");
+                        }
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-ai/30 bg-ai/10 py-3 text-[14px] font-semibold text-ai"
+                    >
+                      <IconShare className="h-4 w-4" />
+                      Can&apos;t decide? Let friends vote
+                    </button>
+                  )}
+                  {t.pollId && <VotePanel pollId={t.pollId} />}
                   {t.done && (
                     <div className="no-scrollbar flex gap-2 overflow-x-auto pt-1">
                       {["Cheaper options", "Somewhere quieter", "Closer to me", "Something more unusual"].map((r) => (
@@ -255,6 +287,7 @@ function ConciergeInner() {
             placeholder={turns.length ? "Refine, or ask something new…" : "Dinner with my parents, they love fish…"}
             className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-[15px] outline-none placeholder:text-muted/70"
           />
+          <VoiceButton disabled={busy} onText={setInput} onFinal={(t) => ask(t)} />
           <button disabled={busy || input.trim().length < 3} aria-label="Send" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-black transition disabled:bg-white/10 disabled:text-muted">
             <IconSend />
           </button>

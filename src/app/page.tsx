@@ -9,6 +9,7 @@ import { IconDice, IconPin, IconSparkle } from "@/components/icons";
 import { MapView } from "@/components/map-view";
 import { Photo, PlaceCard, PlaceRow, RowSkeleton } from "@/components/place-bits";
 import { readViewed, haptic, type RecentItem } from "@/lib/client/extras";
+import type { Weather } from "@/lib/weather";
 import { api } from "@/lib/client/api";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 
@@ -27,6 +28,15 @@ export default function Discover() {
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>(CATEGORIES[2]);
   const [list, setList] = useState<Place[] | null>(null);
   const [viewed, setViewed] = useState<RecentItem[]>([]);
+  const [weather, setWeather] = useState<Weather | null>(null);
+
+  useEffect(() => {
+    if (!ready) return;
+    fetch(`/api/weather?lat=${center.lat}&lng=${center.lng}`)
+      .then((r) => r.json())
+      .then((d) => setWeather(d.weather))
+      .catch(() => {});
+  }, [center, ready]);
   const [rolling, setRolling] = useState(false);
   const router = useRouter();
 
@@ -77,6 +87,19 @@ export default function Discover() {
       </header>
 
       <section className="fade-up px-5 pt-7">
+        {weather && (
+          <Link
+            href={`/concierge?q=${encodeURIComponent(weather.isRainy || weather.isCold ? "Somewhere cozy indoors, close by" : weather.isNice ? "A nice terrace for a drink" : "Something good nearby right now")}`}
+            className="mb-3 inline-flex items-center gap-2 rounded-full bg-surface/70 py-1 pl-1.5 pr-3 text-[13px]"
+          >
+            <span className="text-base">{weather.emoji}</span>
+            <span className="font-medium">{weather.tempC}°</span>
+            <span className="text-muted">
+              {weather.label}
+              {weather.isRainy || weather.isCold ? " · cozy indoor picks →" : weather.isNice ? " · terrace weather →" : ""}
+            </span>
+          </Link>
+        )}
         <p className="text-sm text-muted">
           {greeting()}
           {user ? `, ${user.name.split(" ")[0]}` : ""}
