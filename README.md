@@ -52,7 +52,7 @@ All provider responses are normalised into one `Place` type, so the UI and the a
 
 **Photos.** Venue's own photo (Google, or the preview image of its website with logos, social avatars and stock images filtered out) → Google Street View of the entrance (Google's own imagery within 35 m) → an illustrated tile with the category icon. No stock photos that could pass for the real place. The venue photo always stays first, so it comes back as soon as the Google quota resets.
 
-**Cost control.** Field masks request only what the UI shows; Google photos are capped at 3 per place; **Lumi searches OpenStreetMap** (5-8 searches per request, free and cached) and only its final 2-3 picks are looked up on Google for ratings, photos and reviews; Street View panorama lookups are free and stored in the database, images are cached by the CDN for a week, and a daily counter stops at 300 images, below the free monthly tier.
+**Cost control.** Field masks request only what the UI shows; Google photos are capped at 3 per place; when Lumi's searches fall back to OpenStreetMap, its final 2-3 picks are still looked up on Google for ratings, photos and reviews; Street View panorama lookups are free and stored in the database, images are cached by the CDN for a week, and a daily counter stops at 300 images, below the free monthly tier.
 
 ## Lumi, the agent
 

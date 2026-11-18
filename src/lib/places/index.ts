@@ -183,7 +183,9 @@ export const places: PlacesProvider = g.placesProvider ?? (g.placesProvider = wi
  * machine-readable opening hours for plan checks). Only its final 2-3 picks go to Google
  * (see enrichWithGoogle) for ratings, photos and reviews.
  */
-export const conciergePlaces: PlacesProvider = placesMode() === "google" ? withinReach(osmShared()) : places;
+// Back to Google-first search for the demo (better picks); enrichWithGoogle is then a no-op for
+// Google results and still upgrades any OpenStreetMap fallback picks.
+export const conciergePlaces: PlacesProvider = places;
 
 const norm = (s: string) =>
   s
