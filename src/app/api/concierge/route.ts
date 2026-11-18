@@ -15,7 +15,7 @@ import { env } from "@/lib/env";
 import { anonConciergeLimiter, conciergeLimiter } from "@/lib/ratelimit";
 
 export const maxDuration = 60;
-const DEADLINE_MS = 50_000; // finish (with an error event) before the platform kills the function
+const DEADLINE_MS = 45_000; // answer (best effort if needed) well before the platform limit
 
 const Body = z.object({
   prompt: z.string().trim().min(3).max(500),
@@ -73,10 +73,9 @@ export async function POST(req: Request) {
         // Stop spending tokens when the client disconnects or the deadline passes.
         const abort = new AbortController();
         req.signal.addEventListener("abort", () => abort.abort());
-        const timer = setTimeout(() => {
-          emit({ t: "error", message: "That took too long. Try a more specific request." });
-          abort.abort();
-        }, DEADLINE_MS);
+        const deadline = Date.now() + DEADLINE_MS;
+        // Hard stop only for a hung model call; the agent itself wraps up ~13 s before the deadline.
+        const timer = setTimeout(() => abort.abort(), DEADLINE_MS - 2_000);
         try {
           const picks = await runConcierge(
             { prompt: body.data.prompt, center, localTime, savedNames, previous: body.data.previous, lang: body.data.lang, weather: weather ? weatherHint(weather) : undefined },
@@ -85,6 +84,7 @@ export async function POST(req: Request) {
               places,
               emit,
               signal: abort.signal,
+              deadline,
               nowMinutes: hh * 60 + mm,
               geocode: async (near) => (await geocode(near, { geoapifyKey: env.geoapifyKey || undefined, near: center, limit: 1 }))[0]?.location ?? null,
               // Hours are machine-checkable for OpenStreetMap venues; other providers return null (unknown).

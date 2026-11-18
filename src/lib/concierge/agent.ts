@@ -33,6 +33,8 @@ export type ConciergeDeps = {
   /** Minutes since local midnight now, and an hours check for plan validation (null = unknown hours). */
   nowMinutes?: number;
   openAt?: (place: Place, minutesOfDay: number, dayOffset: number) => boolean | null;
+  /** Epoch ms by which an answer must be out; the agent stops asking the model in time. */
+  deadline?: number;
   /** Resolves a named area to coordinates (for "dinner in Podil" while the guest is elsewhere). */
   geocode?: (near: string) => Promise<LatLng | null>;
 };
@@ -181,64 +183,100 @@ export async function runConcierge(input: ConciergeInput, deps: ConciergeDeps): 
   const session = llm({ system: SYSTEM_PROMPT, tools: TOOLS, userMessage: buildUserMessage(input), signal });
   emit({ t: "status", text: "Reading your request" });
 
-  for (let turn = 0; turn < maxTurns; turn++) {
-    if (signal?.aborted) return null;
-    const started = Date.now();
-    const { toolCalls, refused, text, model } = await session.next();
-    emit({ t: "debug", text: `turn ${turn + 1}: ${((Date.now() - started) / 1000).toFixed(1)}s, ${toolCalls.length} tool call(s)${model ? ` via ${model}` : ""}${toolCalls.length ? "" : `, text: ${text.slice(0, 80)}`}` });
-    if (refused) {
-      emit({ t: "error", message: "The concierge could not help with that request." });
-      return null;
-    }
-    if (toolCalls.length === 0) {
-      // Model answered in prose instead of calling present_picks: nudge it.
-      session.addUserText("Please call present_picks with your recommendations.");
-      continue;
-    }
+  try {
+    for (let turn = 0; turn < maxTurns; turn++) {
+      if (signal?.aborted) break;
+      // Not enough time left for another model round: answer with what we have.
+      if (deps.deadline && Date.now() > deps.deadline - 13_000) break;
+      const started = Date.now();
+      const { toolCalls, refused, text, model } = await session.next();
+      emit({ t: "debug", text: `turn ${turn + 1}: ${((Date.now() - started) / 1000).toFixed(1)}s, ${toolCalls.length} tool call(s)${model ? ` via ${model}` : ""}${toolCalls.length ? "" : `, text: ${text.slice(0, 80)}`}` });
+      if (refused) break;
+      if (toolCalls.length === 0) {
+        // Model answered in prose instead of calling present_picks: nudge it.
+        session.addUserText("Please call present_picks with your recommendations.");
+        continue;
+      }
 
-    let final: Picks | null = null;
-    let plan: Plan | null = null;
-    const results: ToolResult[] = await Promise.all(
-      toolCalls.map(async (call, i) => {
-        // Cost guard: a single turn may not fan out into unlimited API calls.
-        const searchKey = call.name === "search_places" ? JSON.stringify(call.input) : null;
-        let out: Awaited<ReturnType<typeof executeTool>>;
-        if (i >= MAX_TOOL_USES_PER_TURN) out = { content: `Skipped: at most ${MAX_TOOL_USES_PER_TURN} tool calls per turn.`, isError: true };
-        else if (searchKey && searched.has(searchKey)) out = { content: "You already ran this exact search; use those results or try a different angle.", isError: true };
-        else {
-          if (searchKey) searched.add(searchKey);
-          out = await executeTool(call, input.center, places, seen, emit, deps);
-        }
-        if (out.final) final = out.final;
-        if (out.plan) plan = out.plan;
-        return { id: call.id, name: call.name, content: out.content, isError: out.isError };
-      }),
-    );
-    if (plan) {
-      const p = plan as Plan;
-      emit({
-        t: "plan",
-        intro: p.intro,
-        stops: p.stops.map((s, i) => {
-          const place = seen.get(s.place_id)!;
-          const from = i === 0 ? input.center : seen.get(p.stops[i - 1].place_id)!.location;
-          return { ...s, place, walk_min: walkingMinutes(distanceMeters(from, place.location)) };
+      let final: Picks | null = null;
+      let plan: Plan | null = null;
+      const results: ToolResult[] = await Promise.all(
+        toolCalls.map(async (call, i) => {
+          // Cost guard: a single turn may not fan out into unlimited API calls.
+          const searchKey = call.name === "search_places" ? JSON.stringify(call.input) : null;
+          let out: Awaited<ReturnType<typeof executeTool>>;
+          if (i >= MAX_TOOL_USES_PER_TURN) out = { content: `Skipped: at most ${MAX_TOOL_USES_PER_TURN} tool calls per turn.`, isError: true };
+          else if (searchKey && searched.has(searchKey)) out = { content: "You already ran this exact search; use those results or try a different angle.", isError: true };
+          else {
+            if (searchKey) searched.add(searchKey);
+            out = await executeTool(call, input.center, places, seen, emit, deps);
+          }
+          if (out.final) final = out.final;
+          if (out.plan) plan = out.plan;
+          return { id: call.id, name: call.name, content: out.content, isError: out.isError };
         }),
-      });
-      return { intro: p.intro, picks: p.stops.map((s) => ({ place_id: s.place_id, headline: s.what, why: s.why, tip: s.time })) };
+      );
+      if (plan) {
+        const p = plan as Plan;
+        emit({
+          t: "plan",
+          intro: p.intro,
+          stops: p.stops.map((s, i) => {
+            const place = seen.get(s.place_id)!;
+            const from = i === 0 ? input.center : seen.get(p.stops[i - 1].place_id)!.location;
+            return { ...s, place, walk_min: walkingMinutes(distanceMeters(from, place.location)) };
+          }),
+        });
+        return { intro: p.intro, picks: p.stops.map((s) => ({ place_id: s.place_id, headline: s.what, why: s.why, tip: s.time })) };
+      }
+      if (final) {
+        const picks = final as Picks;
+        emit({ t: "result", intro: picks.intro, picks: picks.picks.map((p) => ({ ...p, place: seen.get(p.place_id)! })) });
+        return picks;
+      }
+      // Promise.all keeps call order, so results line up with the calls.
+      session.addToolResults(results);
+      // Keep runs short: after a couple of research rounds, ask for the answer.
+      if (turn === maxTurns - 3) session.addUserText("You have enough information now. Choose and call present_picks (or present_plan) in your next reply.");
     }
-    if (final) {
-      const picks = final as Picks;
-      emit({ t: "result", intro: picks.intro, picks: picks.picks.map((p) => ({ ...p, place: seen.get(p.place_id)! })) });
-      return picks;
-    }
-    // Promise.all keeps call order, so results line up with the calls.
-    session.addToolResults(results);
-    // Keep runs short: after a couple of research rounds, ask for the answer.
-    if (turn === maxTurns - 3) session.addUserText("You have enough information now. Choose and call present_picks (or present_plan) in your next reply.");
+  } catch (err) {
+    // Model or network trouble (quota, timeout, outage): fall through to the best-effort answer.
+    emit({ t: "debug", text: `agent stopped: ${err instanceof Error ? err.message.slice(0, 160) : "unknown"}` });
   }
-  emit({ t: "error", message: "The concierge took too long. Try a more specific request." });
-  return null;
+  return bestEffort(input, deps, seen);
+}
+
+/**
+ * Never leave the guest with an error: if the model could not finish (time, quota, outage),
+ * pick the strongest places we already found, or search directly with the guest's words.
+ */
+export async function bestEffort(input: ConciergeInput, deps: Pick<ConciergeDeps, "places" | "emit">, seen: Map<string, Place>): Promise<Picks | null> {
+  let pool = [...seen.values()];
+  if (pool.length === 0) {
+    try {
+      pool = await deps.places.search({ query: input.prompt, center: input.center, limit: 12 });
+      if (pool.length === 0) pool = await deps.places.search({ query: "restaurant cafe bar", center: input.center, limit: 12 });
+    } catch {
+      pool = [];
+    }
+  }
+  const uk = input.lang === "uk";
+  if (pool.length === 0) {
+    deps.emit({ t: "error", message: uk ? "Поруч не знайшлося жодного місця. Спробуй інший район." : "No places found nearby. Try another area." });
+    return null;
+  }
+  const score = (p: Place) => (p.rating ?? 4.2) * 2 + (p.openNow === false ? -3 : p.openNow ? 1 : 0) - distanceMeters(input.center, p.location) / 800;
+  const top = pool.sort((a, b) => score(b) - score(a)).slice(0, 3);
+  const picks: Picks = {
+    intro: uk ? "Ось найкращі варіанти поруч під твій запит." : "Here are the best matches nearby.",
+    picks: top.map((p) => {
+      const walk = walkingMinutes(distanceMeters(input.center, p.location));
+      const bits = [p.rating ? `★ ${p.rating.toFixed(1)}` : null, uk ? `${walk} хв пішки` : `${walk} min walk`, p.openNow ? (uk ? "відчинено зараз" : "open now") : null].filter(Boolean);
+      return { place_id: p.id, headline: p.type, why: `${p.summary ?? p.type}. ${bits.join(" · ")}.`, tip: "" };
+    }),
+  };
+  deps.emit({ t: "result", intro: picks.intro, picks: picks.picks.map((p) => ({ ...p, place: top.find((x) => x.id === p.place_id)! })) });
+  return picks;
 }
 
 async function executeTool(

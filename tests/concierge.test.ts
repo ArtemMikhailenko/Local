@@ -64,18 +64,36 @@ describe("runConcierge agent loop", () => {
     expect(events.filter((e) => e.t === "search")).toHaveLength(2);
   });
 
-  it("stops on a refusal without running tools", async () => {
+  it("on a refusal it runs none of the model's tools but still answers with nearby picks", async () => {
     const m = scripted([turn([call("t1", "search_places", { query: "x" })], true)]);
     const events: ConciergeEvent[] = [];
-    expect(await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: (e) => events.push(e) })).toBeNull();
-    expect(events.some((e) => e.t === "error")).toBe(true);
+    const picks = await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: (e) => events.push(e) });
     expect(events.some((e) => e.t === "search")).toBe(false);
+    expect(picks?.picks.length).toBeGreaterThan(0);
+    expect(events.some((e) => e.t === "error")).toBe(false);
+  });
+
+  it("never surfaces an error when the model crashes: falls back to the best places found so far", async () => {
+    const m = scripted([turn([call("t1", "search_places", { query: "wine bar" })])]);
+    m.next.mockImplementationOnce(async () => turn([call("t1", "search_places", { query: "wine bar" })])).mockRejectedValueOnce(new Error("quota"));
+    const events: ConciergeEvent[] = [];
+    const picks = await runConcierge({ ...input, lang: "uk" }, { llm: m.llm, places: createDemoProvider(), emit: (e) => events.push(e) });
+    const result = events.find((e) => e.t === "result");
+    expect(result && result.t === "result" && result.intro).toContain("найкращі");
+    expect(picks!.picks.every((p) => p.place_id.startsWith("demo_"))).toBe(true);
+  });
+
+  it("wraps up before the deadline instead of starting another model round", async () => {
+    const m = scripted([turn([call("t1", "search_places", { query: "coffee" })])]);
+    await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: () => {}, deadline: Date.now() + 5_000 });
+    expect(m.next).not.toHaveBeenCalled();
   });
 
   it("gives up after maxTurns instead of looping forever", async () => {
     const m = scripted([turn([call("t", "search_places", { query: "coffee" })])]);
-    expect(await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: () => {}, maxTurns: 3 })).toBeNull();
+    const picks = await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: () => {}, maxTurns: 3 });
     expect(m.next).toHaveBeenCalledTimes(3);
+    expect(picks?.picks.length).toBeGreaterThan(0); // best effort, not an error
   });
 
   it("nudges the model when it answers in prose instead of calling present_picks", async () => {
@@ -107,7 +125,7 @@ describe("runConcierge agent loop", () => {
       ctrl.abort();
       return turn([call("t1", "search_places", { query: "coffee" })]);
     });
-    expect(await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: () => {}, signal: ctrl.signal })).toBeNull();
+    await runConcierge(input, { llm: m.llm, places: createDemoProvider(), emit: () => {}, signal: ctrl.signal });
     expect(m.next).toHaveBeenCalledTimes(1);
   });
 
