@@ -16,6 +16,7 @@ import { api } from "@/lib/client/api";
 import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 import { weatherIcon, type Weather } from "@/lib/weather";
+import type { Key } from "@/lib/i18n";
 import { categoryPhoto } from "@/lib/places/category-photos";
 
 
@@ -101,7 +102,7 @@ export default function Discover() {
 
   const time = now?.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
   const evening = now ? now.getHours() >= 17 || now.getHours() < 4 : true;
-  const weatherPrompt = weather?.isRainy || weather?.isCold ? "Somewhere cozy indoors, close by" : weather?.isNice ? "A good terrace for a drink" : "Something good nearby right now";
+  const weatherPrompt = t(weather?.isRainy || weather?.isCold ? "wp.cozy" : weather?.isNice ? "wp.terrace" : "wp.any");
 
   return (
     <main className="px-4 pt-[max(env(safe-area-inset-top),16px)]">
@@ -157,7 +158,7 @@ export default function Discover() {
           <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="mt-3 flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 text-[14px] text-text">
             <Glyph name={weatherIcon(weather)} className="h-6 w-6 shrink-0 text-accent" />
             <span>
-              {weather.label}, {weather.tempC}°. {weather.isNice ? t("home.weather.nice") : t("home.weather.cozy")}
+              {t(`wl.${weather.label}` as Key)}, {weather.tempC}°. {weather.isNice ? t("home.weather.nice") : t("home.weather.cozy")}
             </span>
           </Link>
         )}
