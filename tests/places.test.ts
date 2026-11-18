@@ -39,7 +39,7 @@ describe("Google Places normalization", () => {
 
   it("routes photos through our proxy and drops anything that is not a Places photo ref", () => {
     const p = normalizeGooglePlace(raw);
-    expect(p.photos).toEqual(["/api/photo?ref=places%2FChIJabc123xyz%2Fphotos%2FAbC-1_2"]);
+    expect(p.photos).toEqual(["/api/photo?ref=places%2FChIJabc123xyz%2Fphotos%2FAbC-1_2&i=0"]);
     expect(PHOTO_REF_RE.test("places/a/photos/b")).toBe(true);
     expect(PHOTO_REF_RE.test("places/a/photos/b/../../x")).toBe(false);
   });

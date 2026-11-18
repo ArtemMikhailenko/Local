@@ -7,7 +7,7 @@ import { DEFAULT_CENTER } from "@/lib/geo";
 import { llmProvider } from "@/lib/llm";
 import { LlmRateLimitError } from "@/lib/llm/types";
 import { HttpError, assertSameOrigin, clientIp, handleError } from "@/lib/http";
-import { places } from "@/lib/places";
+import { conciergePlaces, enrichWithGoogle } from "@/lib/places";
 import { openAtFromHours } from "@/lib/places/osm";
 import { geocode } from "@/lib/geocode";
 import { getWeather, weatherHint } from "@/lib/weather";
@@ -62,13 +62,26 @@ export async function POST(req: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         let closed = false;
-        const emit = (e: ConciergeEvent) => {
+        const send = (e: ConciergeEvent) => {
           if (closed) return;
           try {
             controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
           } catch {
             closed = true; // client went away
           }
+        };
+        // Final answers: upgrade the 2-3 OpenStreetMap picks with Google data before sending.
+        const pendingFinal: Promise<void>[] = [];
+        const emit = (e: ConciergeEvent) => {
+          if (e.t === "result") {
+            pendingFinal.push(
+              Promise.all(e.picks.map(async (p) => ({ ...p, place: await enrichWithGoogle(p.place) }))).then((picks) => send({ ...e, picks })),
+            );
+          } else if (e.t === "plan") {
+            pendingFinal.push(
+              Promise.all(e.stops.map(async (s) => ({ ...s, place: await enrichWithGoogle(s.place) }))).then((stops) => send({ ...e, stops })),
+            );
+          } else send(e);
         };
         // Stop spending tokens when the client disconnects or the deadline passes.
         const abort = new AbortController();
@@ -81,7 +94,7 @@ export async function POST(req: Request) {
             { prompt: body.data.prompt, center, localTime, savedNames, previous: body.data.previous, lang: body.data.lang, weather: weather ? weatherHint(weather) : undefined },
             {
               llm: await provider.factory(),
-              places,
+              places: conciergePlaces,
               emit,
               signal: abort.signal,
               deadline,
@@ -91,6 +104,7 @@ export async function POST(req: Request) {
               openAt: (place, minutes, dayOffset) => (place.id.startsWith("osm_") ? openAtFromHours(place.hours.join("; "), now, env.timeZone, minutes, dayOffset) : null),
             },
           );
+          await Promise.all(pendingFinal);
           if (picks && user) {
             await db.insert(schema.conciergeRuns).values({ userId: user.id, prompt: body.data.prompt, result: picks });
           }

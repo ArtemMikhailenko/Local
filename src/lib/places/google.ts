@@ -45,7 +45,7 @@ const PRICE_ENUM = ["", "PRICE_LEVEL_INEXPENSIVE", "PRICE_LEVEL_MODERATE", "PRIC
 
 /** Photo names look like places/{placeId}/photos/{photoId}; we proxy them so the API key never reaches the browser. */
 export const PHOTO_REF_RE = /^places\/[A-Za-z0-9_-]+\/photos\/[A-Za-z0-9_-]+$/;
-export const photoUrl = (ref: string) => `/api/photo?ref=${encodeURIComponent(ref)}`;
+export const photoUrl = (ref: string, i = 0) => `/api/photo?ref=${encodeURIComponent(ref)}&i=${i}`;
 
 const httpUrl = (u: unknown) => (typeof u === "string" && /^https?:\/\//i.test(u) ? u : null);
 
@@ -66,7 +66,7 @@ export function normalizeGooglePlace(p: any): Place {
       .map((ph: any) => ph?.name)
       .filter((n: unknown): n is string => typeof n === "string" && PHOTO_REF_RE.test(n))
       .slice(0, 3) // each photo costs a Places API request: keep it to three
-      .map(photoUrl),
+      .map((ref: string, i: number) => photoUrl(ref, i)),
     summary: p.editorialSummary?.text ?? null,
     website: httpUrl(p.websiteUri),
     phone: p.nationalPhoneNumber ?? null,

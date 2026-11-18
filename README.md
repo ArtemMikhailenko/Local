@@ -50,9 +50,9 @@ UI in Ukrainian and English (auto-detected, switchable).
 
 All provider responses are normalised into one `Place` type, so the UI and the agent never depend on a specific provider.
 
-**Photos, cheapest first.** Venue's own photo (from its website's preview image, or Google) → Street View of the entrance → a category photo labelled as illustrative. The venue photo always stays first, so it comes back as soon as the Google quota resets.
+**Photos.** Venue's own photo (Google, or the preview image of its website with logos, social avatars and stock images filtered out) → Google Street View of the entrance (Google's own imagery within 35 m) → an illustrated tile with the category icon. No stock photos that could pass for the real place. The venue photo always stays first, so it comes back as soon as the Google quota resets.
 
-**Cost control.** Field masks request only what the UI shows; Google photos are capped at 3 per place and cached for a day; Street View panorama lookups are free and stored in the database, images are cached by the CDN for a week, and a daily counter stops at 300 images, below the free monthly tier.
+**Cost control.** Field masks request only what the UI shows; Google photos are capped at 3 per place; **Lumi searches OpenStreetMap** (5-8 searches per request, free and cached) and only its final 2-3 picks are looked up on Google for ratings, photos and reviews; Street View panorama lookups are free and stored in the database, images are cached by the CDN for a week, and a daily counter stops at 300 images, below the free monthly tier.
 
 ## Lumi, the agent
 
@@ -76,7 +76,7 @@ Guardrails:
 
 ## Tests
 
-77 unit tests (Vitest) in `tests/`:
+82 unit tests (Vitest) in `tests/`:
 
 | File | What it covers |
 | --- | --- |
@@ -131,7 +131,8 @@ npm run dev                    # http://localhost:3000
 About 8 hours of work in one day (see the git history).
 
 - Rate limits and the short response cache are in memory per serverless instance; production at scale would use Redis.
-- Google Places has a monthly free quota; when photos run out, venues fall back to Street View and category photos.
+- Google Places has a monthly free quota; when photos run out, venues fall back to Street View and illustrated tiles.
+- **Demo shortcut:** Google photo URLs are stored for 3 days (`google_photos`) so the free photo quota lasts. Google's terms do not allow storing their content, so a production build would drop this table and pay per photo view instead.
 - OpenStreetMap venues have no ratings or reviews.
 - No email verification or password reset.
 - Public events have no moderation or reporting yet (an account is required to publish).

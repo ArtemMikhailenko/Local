@@ -57,6 +57,13 @@
       "when": 1795030824233,
       "tag": "0007_public_events",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795035827740,
+      "tag": "0008_google_photos",
+      "breakpoints": true
     }
   ]
 }

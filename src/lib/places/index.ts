@@ -118,13 +118,21 @@ function withSitePhotos(inner: PlacesProvider): PlacesProvider {
   };
 }
 
-const g = globalThis as unknown as { placesProvider?: PlacesProvider };
+const g = globalThis as unknown as { placesProvider?: PlacesProvider; osmProvider?: PlacesProvider; googleProvider?: PlacesProvider };
+function osmShared(): PlacesProvider {
+  return g.osmProvider ?? (g.osmProvider = buildOsm());
+}
+function googleShared(): PlacesProvider | null {
+  if (placesMode() !== "google") return null;
+  return g.googleProvider ?? (g.googleProvider = withSitePhotos(cached(createGoogleProvider(env.googlePlacesKey))));
+}
 function build(): PlacesProvider {
   const mode = placesMode();
   if (mode === "demo") return createDemoProvider();
-  const osm = buildOsm();
+  const osm = osmShared();
   // Google first (ratings, real photos); if it fails or its daily quota is used up, fall back to OpenStreetMap.
-  if (mode === "google") return withFallback(withSitePhotos(cached(createGoogleProvider(env.googlePlacesKey))), osm);
+  const google = googleShared();
+  if (google) return withFallback(google, osm);
   return osm;
 }
 
@@ -168,3 +176,46 @@ export function withinReach(inner: PlacesProvider): PlacesProvider {
 }
 
 export const places: PlacesProvider = g.placesProvider ?? (g.placesProvider = withinReach(build()));
+
+/**
+ * What the concierge searches with. Lumi runs many searches per request (5-8), which would burn
+ * the Google daily quota by lunch, so it searches OpenStreetMap (free, cached, and with
+ * machine-readable opening hours for plan checks). Only its final 2-3 picks go to Google
+ * (see enrichWithGoogle) for ratings, photos and reviews.
+ */
+export const conciergePlaces: PlacesProvider = placesMode() === "google" ? withinReach(osmShared()) : places;
+
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/** Same venue? Names overlap (either contains the other, or share a 4+ letter word) and are close. */
+export function sameVenue(a: Pick<Place, "name" | "location">, b: Pick<Place, "name" | "location">, maxM = 150): boolean {
+  if (distanceMeters(a.location, b.location) > maxM) return false;
+  const x = norm(a.name), y = norm(b.name);
+  if (!x || !y) return false;
+  if (x.includes(y) || y.includes(x)) return true;
+  const words = new Set(x.split(" ").filter((w) => w.length >= 4));
+  return y.split(" ").some((w) => w.length >= 4 && words.has(w));
+}
+
+/**
+ * Swap an OpenStreetMap pick for the same venue on Google (rating, real photos, reviews), one
+ * small search per pick. Keeps the OSM version when Google has no match or is out of quota.
+ */
+export async function enrichWithGoogle(place: Place): Promise<Place> {
+  const google = googleShared();
+  if (!google || !place.id.startsWith("osm_")) return place;
+  try {
+    const hits = await google.search({ query: place.name, center: place.location, radiusM: 200, limit: 3 });
+    const hit = hits.find((h) => sameVenue(place, h));
+    if (!hit) return place;
+    // Google's hours are free text; keep OSM's machine-readable ones when Google has none.
+    return { ...hit, hours: hit.hours.length ? hit.hours : place.hours, summary: hit.summary ?? place.summary };
+  } catch {
+    return place;
+  }
+}

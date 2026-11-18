@@ -154,3 +154,14 @@ export const apiUsage = pgTable(
   },
   (t) => [primaryKey({ columns: [t.day, t.api] })],
 );
+
+/**
+ * Google photo URLs (googleusercontent) per place photo, kept 3 days so each photo costs one
+ * Places request per 3 days instead of one per viewer per day. Demo shortcut: Google's terms
+ * do not allow storing their content, so production would drop this table (see README).
+ */
+export const googlePhotos = pgTable("google_photos", {
+  key: text("key").primaryKey(), // "{placeId}:{index}"
+  uri: text("uri").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
