@@ -64,6 +64,9 @@ const en = {
   "c.suggestions":
     "Plan a 4-hour date night from now, ending with a nightcap|Romantic dinner for two, not too pricey, walking distance|We're 4 friends, want craft beer and something to eat|Rainy afternoon with a 6-year-old|Quiet café to work for 3 hours with good wifi|Best spot to watch the sunset with a drink",
   "c.thinking": "Lumi is looking around",
+  "c.reading": "Reading your request",
+  "c.searched": "Searched “{q}”: {n} found",
+  "c.checking": "Checking {name}",
   "c.walkAll": "Walk all",
   "c.vote": "Friends vote",
   "c.voteLive": "Vote is live ↓",
@@ -175,6 +178,9 @@ const uk: Record<Key, string> = {
   "c.suggestions":
     "Сплануй побачення на 4 години, наостанок коктейль|Романтична вечеря на двох, недорого і пішки|Нас 4 друзі, хочемо крафтове пиво й поїсти|Дощовий день з дитиною 6 років|Тиха кав'ярня попрацювати 3 години з хорошим wifi|Де подивитися захід сонця з келихом",
   "c.thinking": "Lumi роздивляється довкола",
+  "c.reading": "Читаю запит",
+  "c.searched": "Шукаю «{q}»: знайдено {n}",
+  "c.checking": "Перевіряю {name}",
   "c.walkAll": "Пройти всі",
   "c.vote": "Голосування",
   "c.voteLive": "Голосування йде ↓",

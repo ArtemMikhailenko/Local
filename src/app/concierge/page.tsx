@@ -13,16 +13,17 @@ import { walkingRouteUrl } from "@/lib/route";
 import { IllustrativeTag, Meta, Photo, SaveButton } from "@/components/place-bits";
 import type { ConciergeEvent } from "@/lib/concierge/agent";
 import { placeCache } from "@/lib/client/api";
+import type { T } from "@/lib/i18n";
 
 type Step = { kind: "status" | "search" | "inspect"; text: string };
 type ResultEvent = Extract<ConciergeEvent, { t: "result" }>;
 type PlanEvent = Extract<ConciergeEvent, { t: "plan" }>;
 type Turn = { id: number; prompt: string; steps: Step[]; result?: ResultEvent; plan?: PlanEvent; error?: string; done: boolean; pollId?: string };
 
-function stepFrom(e: ConciergeEvent): Step | null {
-  if (e.t === "status") return { kind: "status", text: e.text.toLowerCase() };
-  if (e.t === "search") return { kind: "search", text: `search “${e.query}” → ${e.count} found` };
-  if (e.t === "inspect") return { kind: "inspect", text: `check ${e.name}` };
+function stepFrom(e: ConciergeEvent, tr: T): Step | null {
+  if (e.t === "status") return { kind: "status", text: tr("c.reading") };
+  if (e.t === "search") return { kind: "search", text: tr("c.searched", { q: e.query, n: e.count }) };
+  if (e.t === "inspect") return { kind: "inspect", text: tr("c.checking", { name: e.name }) };
   return null;
 }
 
@@ -92,7 +93,7 @@ function ConciergeInner() {
         for (const line of lines) {
           if (!line.trim()) continue;
           const e = JSON.parse(line) as ConciergeEvent;
-          const step = stepFrom(e);
+          const step = stepFrom(e, tr);
           if (step) update(id, (t) => ({ ...t, steps: [...t.steps, step] }));
           if (e.t === "result" || e.t === "plan" || e.t === "error") finished = true;
           if (e.t === "plan") e.stops.forEach((s) => placeCache.set(s.place.id, s.place));

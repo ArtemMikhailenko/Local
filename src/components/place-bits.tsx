@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { haptic } from "@/lib/client/extras";
@@ -82,9 +83,10 @@ export function IllustrativeTag({ className }: { className?: string }) {
 }
 
 export function Photo({ src, alt, className }: { src?: string; alt: string; className?: string }) {
-  if (!src) return <div className={clsx("bg-surface-2", className)} />;
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <div className={clsx("bg-surface-2", className)} />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" className={clsx("object-cover", className)} />;
+  return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={clsx("object-cover", className)} />;
 }
 
 /** Photo-first card for carousels. */

@@ -117,7 +117,20 @@ const g = globalThis as unknown as { placesProvider?: PlacesProvider };
 function build(): PlacesProvider {
   const mode = placesMode();
   if (mode === "demo") return createDemoProvider();
-  if (mode === "google") return cached(createGoogleProvider(env.googlePlacesKey));
+  const osm = buildOsm();
+  // Google first (ratings, real photos); if it fails or its daily quota is used up, fall back to OpenStreetMap.
+  if (mode === "google") return withFallback(cached(createGoogleProvider(env.googlePlacesKey)), osm);
+  return osm;
+}
+
+function withFallback(primary: PlacesProvider, backup: PlacesProvider): PlacesProvider {
+  return {
+    search: (p) => primary.search(p).catch((e) => (console.warn("primary places provider failed, using backup", e), backup.search(p))),
+    details: (id) => (id.startsWith("osm_") ? backup.details(id) : primary.details(id).catch(() => null)),
+  };
+}
+
+function buildOsm(): PlacesProvider {
   const overpass = overpassTransport();
   // Find a venue in the Postgres area cache first: instant on cold serverless instances.
   const one = async (id: string): Promise<OsmVenue | null> => {
