@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
+import { customType, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
 import type { Place } from "@/lib/places/types";
 
 export const users = pgTable("users", {
@@ -164,4 +164,18 @@ export const googlePhotos = pgTable("google_photos", {
   key: text("key").primaryKey(), // "{placeId}:{index}"
   uri: text("uri").notNull(),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * Venue photo files copied from Google, served from our own database forever after the first
+ * fetch: one Places photo request per photo, ever. Demo shortcut (Google's terms forbid storing
+ * their photos); production would delete this table and pay per view. See README.
+ */
+export const photoFiles = pgTable("photo_files", {
+  key: text("key").primaryKey(), // "{placeId}:{index}"
+  mime: text("mime").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
