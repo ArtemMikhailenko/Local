@@ -29,6 +29,8 @@ export function MapView({
   zoom = 14,
   onAreaChange,
   loading,
+  onSelect,
+  keepView,
 }: {
   places: Place[];
   center: LatLng;
@@ -37,6 +39,10 @@ export function MapView({
   zoom?: number;
   onAreaChange?: (c: LatLng) => void;
   loading?: boolean;
+  /** Tap on a pin selects it instead of opening the place page. */
+  onSelect?: (id: string) => void;
+  /** Never auto-fit to markers (the explorer keeps the user's view). */
+  keepView?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
@@ -48,8 +54,8 @@ export function MapView({
   const { t } = useApp();
   const [hint, setHint] = useState(false);
   // Refs so map callbacks always see the latest props, not the first render's.
-  const latest = useRef({ places, activeId, onAreaChange });
-  latest.current = { places, activeId, onAreaChange };
+  const latest = useRef({ places, activeId, onAreaChange, onSelect });
+  latest.current = { places, activeId, onAreaChange, onSelect };
 
   useEffect(() => {
     let cancelled = false;
@@ -116,10 +122,10 @@ export function MapView({
       label.className = `rounded-full px-2 py-0.5 text-[11px] font-semibold leading-tight shadow-md transition group-hover:bg-[#f2543d] group-hover:text-white ${active ? "bg-[#1c1b1a] text-white" : "bg-white text-[#1c1b1a]"}`;
       label.textContent = short(p.name);
       pin.append(dot, label);
-      pin.onclick = () => router.push(`/place/${p.id}`);
+      pin.onclick = () => (latest.current.onSelect ? latest.current.onSelect(p.id) : router.push(`/place/${p.id}`));
       return new maplibregl.Marker({ element: pin, anchor: "left", offset: [-6, 0] }).setLngLat([p.location.lng, p.location.lat]).addTo(m);
     });
-    if (places.length >= 1 && !activeId && !userMoved.current) {
+    if (places.length >= 1 && !activeId && !userMoved.current && !keepView) {
       const b = new maplibregl.LngLatBounds();
       places.forEach((p) => b.extend([p.location.lng, p.location.lat]));
       b.extend([center.lng, center.lat]);

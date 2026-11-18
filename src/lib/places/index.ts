@@ -1,7 +1,7 @@
 import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import type { LatLng } from "@/lib/geo";
+import { distanceMeters, type LatLng } from "@/lib/geo";
 import { env, placesMode } from "@/lib/env";
 import { createOsmProvider, geoapifyTransport, overpassTransport, type FetchArea, type OsmVenue } from "./osm";
 import { createDemoProvider } from "./demo";
@@ -150,4 +150,16 @@ function buildOsm(): PlacesProvider {
   }));
 }
 
-export const places: PlacesProvider = g.placesProvider ?? (g.placesProvider = build());
+/** Search APIs only "bias" towards the area; drop results that are clearly too far to walk. */
+export function withinReach(inner: PlacesProvider): PlacesProvider {
+  return {
+    async search(p) {
+      const max = Math.max(3500, (p.radiusM ?? 2500) * 1.6);
+      const results = await inner.search(p);
+      return results.filter((r) => distanceMeters(p.center, r.location) <= max);
+    },
+    details: (id) => inner.details(id),
+  };
+}
+
+export const places: PlacesProvider = g.placesProvider ?? (g.placesProvider = withinReach(build()));

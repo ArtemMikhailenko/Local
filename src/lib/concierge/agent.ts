@@ -46,7 +46,7 @@ How to work:
 - Prefer variety (not three of the same kind) unless the guest asked for one kind.
 - Reasons must be concrete: mention rating, walking time, price, a dish or detail from the summary/reviews. No generic praise.
 - Use the weather line: when it rains or is cold, favour indoor places and short walks; when it is pleasant, terraces are a plus.
-- If the guest wants a plan for an evening, a few hours, a date or a route with several stops, build a timeline instead: 2–5 stops starting from now, realistic durations, short walks between stops, every place open at its planned time (check hours with get_place_details). Finish with present_plan.
+- If the guest wants a plan for an evening, a few hours, a date or a route with several stops, build a timeline instead: 2–5 stops starting from now, realistic durations, stops within ~15 min walk of each other (use walk_min), every place open at its planned time (check hours with get_place_details). Finish with present_plan.
 - Otherwise finish by calling present_picks exactly once. Never write the recommendations as plain text.
 - Write in the same language the guest used. Keep "intro" to one friendly sentence.`;
 
@@ -276,7 +276,13 @@ async function executeTool(
     }
     if (tool.name === "present_plan") {
       const now = deps.nowMinutes ?? 18 * 60;
-      const v = validatePlan(tool.input, new Set(seen.keys()), now, (id, m, d) => (deps.openAt ? deps.openAt(seen.get(id)!, m, d) : null));
+      const v = validatePlan(
+        tool.input,
+        new Set(seen.keys()),
+        now,
+        (id, m, d) => (deps.openAt ? deps.openAt(seen.get(id)!, m, d) : null),
+        (a, b) => walkingMinutes(distanceMeters(seen.get(a)!.location, seen.get(b)!.location)),
+      );
       if (!v.ok) return { content: v.error, isError: true };
       return { content: "Delivered to the guest.", plan: v.plan };
     }

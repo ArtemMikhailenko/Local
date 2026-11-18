@@ -81,3 +81,21 @@ describe("weather", () => {
     expect(await getWeather({ lat: 1.23, lng: 4.56 }, fetchMock as unknown as typeof fetch)).toBeNull();
   });
 });
+
+import { walkingRouteUrl } from "@/lib/route";
+
+describe("realistic evening plans", () => {
+  it("rejects a plan with a long walk between stops, naming both places", () => {
+    const walk = (a: string, b: string) => (a === "a" && b === "b" ? 299 : 8);
+    const r = validatePlan({ intro: "", stops: [stop("a", "17:30", 120), stop("b", "19:35")] }, seen, 17 * 60, () => null, walk);
+    expect(!r.ok && r.error).toContain("299 min walk");
+  });
+
+  it("switches the route to public transport when a leg is too long to walk", () => {
+    const start = { lat: 50.4651, lng: 30.5155 };
+    const near = { location: { lat: 50.466, lng: 30.517 } };
+    const far = { location: { lat: 50.36, lng: 30.33 } };
+    expect(new URL(walkingRouteUrl(start, [near])!).searchParams.get("travelmode")).toBe("walking");
+    expect(new URL(walkingRouteUrl(start, [near, far])!).searchParams.get("travelmode")).toBe("transit");
+  });
+});

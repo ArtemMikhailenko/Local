@@ -3,12 +3,17 @@ import { Onest } from "next/font/google";
 import { AppProvider } from "@/components/app-provider";
 import { TabBar } from "@/components/tab-bar";
 import { AuthSheet } from "@/components/auth-sheet";
+import { VoteBasketBar } from "@/components/vote-basket";
 import "./globals.css";
 
 // Onest: friendly, very readable, with Cyrillic (many venue names are Ukrainian).
 const onest = Onest({ subsets: ["latin", "cyrillic"], variable: "--font-onest" });
 
+const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  openGraph: { siteName: "Locali", type: "website" },
   title: "Locali · your AI concierge",
   description: "Find the right place nearby, or just tell the concierge what kind of evening you want.",
   appleWebApp: { capable: true, title: "Locali", statusBarStyle: "black-translucent" },
@@ -22,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AppProvider>
           <div className="mx-auto min-h-dvh max-w-[480px] pb-28 sm:border-x sm:border-line">{children}</div>
+          <VoteBasketBar />
           <TabBar />
           <AuthSheet />
         </AppProvider>

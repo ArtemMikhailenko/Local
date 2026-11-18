@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type SavedRow, type User } from "@/lib/client/api";
+import type { Place } from "@/lib/places/types";
 import { DEFAULT_CENTER, distanceMeters, type LatLng } from "@/lib/geo";
 import { detectLang, translator, type Lang, type T } from "@/lib/i18n";
 
@@ -20,6 +21,12 @@ type Ctx = {
   toggleSave: (placeId: string) => Promise<void>;
   refreshSaved: () => Promise<void>;
   toast: (msg: string) => void;
+  /** Places collected for a group vote (max 4), kept in localStorage. */
+  basket: Place[];
+  toggleBasket: (p: Place) => void;
+  clearBasket: () => void;
+  setLocation: (c: LatLng, label: string) => void;
+  locateMe: () => void;
   lang: Lang;
   setLang: (l: Lang) => void;
   t: T;
@@ -38,9 +45,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<"google" | "osm" | "demo">("osm");
   const [center, setCenter] = useState<LatLng>(DEFAULT_CENTER);
   const [nearMe, setNearMe] = useState(false);
+  const [customLabel, setCustomLabel] = useState<string | null>(null);
+  const [basket, setBasket] = useState<Place[]>([]);
+  useEffect(() => {
+    try {
+      const b = JSON.parse(localStorage.getItem("locali:basket") ?? "[]");
+      if (Array.isArray(b)) setBasket(b.slice(0, 4));
+    } catch {}
+  }, []);
+  const saveBasket = (b: Place[]) => {
+    setBasket(b);
+    try {
+      localStorage.setItem("locali:basket", JSON.stringify(b));
+    } catch {}
+  };
   const [lang, setLangState] = useState<Lang>("en");
   const t = useMemo(() => translator(lang), [lang]);
-  const locationLabel = nearMe ? (lang === "uk" ? "Поруч з тобою" : "Near you") : lang === "uk" ? "Поділ, Київ" : "Podil, Kyiv";
+  const locationLabel = customLabel ?? (nearMe ? (lang === "uk" ? "Поруч з тобою" : "Near you") : lang === "uk" ? "Поділ, Київ" : "Podil, Kyiv");
 
   useEffect(() => {
     let stored: string | null = null;
@@ -66,6 +87,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToastMsg((m) => (m === msg ? null : m)), 2200);
   }, []);
 
+  const locate = useCallback((announce: boolean) => {
+    if (!("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCenter(here);
+        setCustomLabel(null);
+        setNearMe(distanceMeters(here, DEFAULT_CENTER) >= 2000);
+      },
+      () => announce && setToastMsg("Location is off in the browser settings"),
+      { timeout: 8000, maximumAge: 120_000 },
+    );
+  }, []);
+
   useEffect(() => {
     api
       .me()
@@ -73,17 +108,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(r.user);
         setMode(r.mode);
         // Demo data lives in Kyiv; with real data we use the guest's actual location.
-        if (r.mode !== "demo" && "geolocation" in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-              setCenter(here);
-              setNearMe(distanceMeters(here, DEFAULT_CENTER) >= 2000);
-            },
-            () => {},
-            { timeout: 6000, maximumAge: 300_000 },
-          );
-        }
+        if (r.mode !== "demo") locate(false);
       })
       .catch(() => {})
       .finally(() => setReady(true));
@@ -138,6 +163,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toggleSave,
     refreshSaved,
     toast,
+    basket,
+    toggleBasket: (p: Place) => {
+      if (basket.some((b) => b.id === p.id)) return saveBasket(basket.filter((b) => b.id !== p.id));
+      if (basket.length >= 4) return toast(lang === "uk" ? "Максимум 4 місця в голосуванні" : "Up to 4 places per vote");
+      saveBasket([...basket, { ...p, reviews: [] }]);
+      toast(lang === "uk" ? "Додано в голосування" : "Added to the vote");
+    },
+    clearBasket: () => saveBasket([]),
+    setLocation: (c: LatLng, label: string) => {
+      setCenter(c);
+      setCustomLabel(label);
+    },
+    locateMe: () => locate(true),
     lang,
     setLang,
     t,

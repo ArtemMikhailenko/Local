@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/components/app-provider";
 import { IconArrow } from "@/components/icons";
 import { MapView } from "@/components/map-view";
+import { BasketButton } from "@/components/vote-basket";
 import { PlaceRow, SaveButton, SectionTitle } from "@/components/place-bits";
 import { api, type SavedRow } from "@/lib/client/api";
 import type { LatLng } from "@/lib/geo";
@@ -30,7 +31,7 @@ function SavedItem({ row, center, index }: { row: SavedRow; center: LatLng; inde
   return (
     <div>
       <PlaceRow place={row.place} center={center} right={<SaveButton placeId={row.place.id} className="!bg-canvas !shadow-none" />} />
-      <div className="pb-2 pl-[94px]">
+      <div className="flex items-center justify-between gap-2 pb-2 pl-[94px] pr-2">
         {editing ? (
           <textarea
             autoFocus
@@ -47,6 +48,7 @@ function SavedItem({ row, center, index }: { row: SavedRow; center: LatLng; inde
             {row.note ? <span className="text-text/85">“{row.note}”</span> : <span className="text-[14px] font-medium text-accent">{t("saved.addNote")}</span>}
           </button>
         )}
+        {!editing && <BasketButton place={row.place} className="!h-8 shrink-0 !px-3 !text-[12px]" />}
       </div>
     </div>
   );

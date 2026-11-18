@@ -41,7 +41,7 @@ export function Walk({ from, to }: { from: LatLng; to: LatLng }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap text-[13px] text-muted">
       <IconWalk className="h-3.5 w-3.5" />
-      {min <= 30 ? t("place.min", { n: min }) : formatDistance(d)}
+      {min <= 30 ? t("place.min", { n: min }) : `${formatDistance(d)}`}
     </span>
   );
 }

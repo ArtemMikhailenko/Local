@@ -61,6 +61,7 @@ export function validatePlan(
   seenIds: ReadonlySet<string>,
   nowMinutes: number,
   openAt: (placeId: string, minutesFromMidnight: number, dayOffset: number) => boolean | null = () => null,
+  walkMinutes: (fromId: string, toId: string) => number | null = () => null,
 ): { ok: true; plan: Plan } | { ok: false; error: string } {
   const parsed = PlanSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: `Invalid plan: ${parsed.error.issues.map((i) => i.message).join("; ")}` };
@@ -81,6 +82,9 @@ export function validatePlan(
     }
     if (prevEnd >= 0 && abs < prevEnd - 10) return { ok: false, error: `Stop at ${s.time} starts before the previous one ends; leave time to walk.` };
     if (prevEnd >= 0 && abs - prevEnd > 3 * 60) return { ok: false, error: `Gap before ${s.time} is too long; keep the evening continuous.` };
+    const prev = stops[stops.indexOf(s) - 1];
+    const walk = prev ? walkMinutes(prev.place_id, s.place_id) : null;
+    if (walk != null && walk > 25) return { ok: false, error: `${prev!.place_id} → ${s.place_id} is a ${walk} min walk. Keep stops within ~20 min of each other; pick a closer place.` };
     if (openAt(s.place_id, toMin(s.time), day) === false) return { ok: false, error: `${s.place_id} is closed at ${s.time}. Check hours with get_place_details and pick another time or place.` };
     prevStart = abs;
     prevEnd = abs + s.duration_min;

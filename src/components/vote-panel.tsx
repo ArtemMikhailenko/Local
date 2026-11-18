@@ -20,20 +20,26 @@ export async function createPoll(title: string, placeIds: string[]): Promise<str
   return data.id as string;
 }
 
-export async function sharePoll(id: string, title: string, toast: (m: string) => void) {
+/**
+ * Some apps (Telegram, Viber) keep only `text` from the share sheet and drop `url`,
+ * so the link always goes inside the text as well.
+ */
+export async function sharePoll(id: string, title: string, toast: (m: string) => void, lang: "en" | "uk" = "en") {
   const url = `${location.origin}/concierge?poll=${id}`;
+  const text =
+    lang === "uk" ? `Допоможи вибрати, куди йдемо: «${title}». Голосуй тут 👉 ${url}` : `Help us choose where to go: “${title}”. Vote here 👉 ${url}`;
   try {
-    if (navigator.share) await navigator.share({ title: "Help us choose", text: `${title}: vote on Locali`, url });
+    if (navigator.share) await navigator.share({ title: lang === "uk" ? "Куди йдемо?" : "Where shall we go?", text });
     else {
-      await navigator.clipboard.writeText(url);
-      toast("Vote link copied, send it to friends");
+      await navigator.clipboard.writeText(text);
+      toast(lang === "uk" ? "Посилання скопійовано, надішли друзям" : "Vote link copied, send it to friends");
     }
   } catch {}
 }
 
 /** Live vote: anyone with the link can vote (no account); results refresh every few seconds. */
 export function VotePanel({ pollId }: { pollId: string }) {
-  const { toast, t } = useApp();
+  const { toast, t, lang } = useApp();
   const [poll, setPoll] = useState<PollState | null>(null);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
@@ -89,7 +95,7 @@ export function VotePanel({ pollId }: { pollId: string }) {
             {t("vote.count", { n: poll.total })}
           </p>
         </div>
-        <button onClick={() => sharePoll(poll.id, poll.title, toast)} aria-label="Share vote link" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
+        <button onClick={() => sharePoll(poll.id, poll.title, toast, lang)} aria-label="Share vote link" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
           <IconShare />
         </button>
       </div>

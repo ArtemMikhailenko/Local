@@ -23,11 +23,18 @@ export function walkingRouteUrl(start: LatLng, stops: Array<{ location: LatLng }
   if (!stops.length) return null;
   const ordered = orderStops(start, stops).slice(0, 10);
   const fmt = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+  // Walk when every leg is short; otherwise let Maps suggest public transport.
+  let prev = start;
+  let longest = 0;
+  for (const s of ordered) {
+    longest = Math.max(longest, distanceMeters(prev, s.location));
+    prev = s.location;
+  }
   const params = new URLSearchParams({
     api: "1",
     origin: fmt(start),
     destination: fmt(ordered[ordered.length - 1].location),
-    travelmode: "walking",
+    travelmode: longest > 2500 ? "transit" : "walking",
   });
   if (ordered.length > 1) params.set("waypoints", ordered.slice(0, -1).map((s) => fmt(s.location)).join("|"));
   return `https://www.google.com/maps/dir/?${params}`;

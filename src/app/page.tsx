@@ -8,6 +8,8 @@ import { useApp } from "@/components/app-provider";
 import { Mascot } from "@/components/mascot";
 import { IconDice, IconPin } from "@/components/icons";
 import { MapView } from "@/components/map-view";
+import { MapExplorer } from "@/components/map-explorer";
+import { LocationSheet } from "@/components/location-sheet";
 import { Photo, PlaceCard, PlaceRow, RowSkeleton, SectionTitle } from "@/components/place-bits";
 import { api } from "@/lib/client/api";
 import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
@@ -37,6 +39,8 @@ export default function Discover() {
   const [viewed, setViewed] = useState<RecentItem[]>([]);
   const [weather, setWeather] = useState<Weather | null>(null);
   const [rolling, setRolling] = useState(false);
+  const [locOpen, setLocOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   // The map can wander away from the list: venues for whatever area the user drags to.
   const [mapPlaces, setMapPlaces] = useState<Place[] | null>(null);
   const [mapLoading, setMapLoading] = useState(false);
@@ -100,11 +104,12 @@ export default function Discover() {
   return (
     <main className="px-4 pt-[max(env(safe-area-inset-top),16px)]">
       <header className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-[14px] font-medium">
+        <button onClick={() => setLocOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-[14px] font-medium transition hover:bg-surface-2 active:scale-95">
           <IconPin className="h-4 w-4 text-accent" />
           {locationLabel}
           {mode === "demo" && <span className="text-muted">· demo</span>}
-        </span>
+          <span className="text-muted">▾</span>
+        </button>
         <div className="flex items-center gap-2">
           <button onClick={() => setLang(lang === "uk" ? "en" : "uk")} aria-label="Language" className="rounded-full bg-canvas px-3 py-1.5 text-[14px] font-semibold">
             {lang === "uk" ? "EN" : "УКР"}
@@ -198,7 +203,10 @@ export default function Discover() {
         >
           {t("home.map")}
         </SectionTitle>
-        <div className="card mt-3 overflow-hidden">
+        <div className="card relative mt-3 overflow-hidden">
+          <button onClick={() => setMapOpen(true)} className="absolute bottom-3 right-3 z-10 rounded-full bg-text px-4 py-2 text-[14px] font-semibold text-white shadow-lg">
+            ⤢ {t("map.open")}
+          </button>
           <MapView places={mapPlaces ?? list?.slice(0, 16) ?? []} center={center} onAreaChange={loadArea} loading={mapLoading} className="h-[320px] w-full" />
         </div>
       </section>
@@ -225,6 +233,8 @@ export default function Discover() {
         </section>
       )}
       <p className="py-10 text-center text-[12px] text-muted">{t("footer.data")}</p>
+      <LocationSheet open={locOpen} onClose={() => setLocOpen(false)} />
+      <MapExplorer open={mapOpen} onClose={() => setMapOpen(false)} initialCat={CATEGORIES.findIndex((c) => c.key === cat.key)} />
     </main>
   );
 }

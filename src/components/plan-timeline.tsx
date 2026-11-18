@@ -47,7 +47,7 @@ export function PlanTimeline({ plan, center }: { plan: PlanEvent; center: LatLng
               <div className="flex items-center gap-2 py-2 pl-[22px] text-[13px] text-muted">
                 <span className="h-6 border-l-2 border-dotted border-line-strong" />
                 <IconWalk className="h-3.5 w-3.5" />
-                {t("plan.walk", { n: s.walk_min })}
+                {s.walk_min <= 30 ? t("plan.walk", { n: s.walk_min }) : t("plan.ride", { n: Math.round((s.walk_min * 80) / 100) / 10 })}
               </div>
             )}
             <Link href={`/place/${s.place.id}`} className="flex gap-3 rounded-2xl transition hover:bg-canvas">

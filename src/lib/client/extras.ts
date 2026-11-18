@@ -10,13 +10,14 @@ export const haptic = (ms = 12) => {
 /** Native share sheet on phones, clipboard fallback on desktop. Returns what happened for a toast. */
 export async function sharePlace(place: Place): Promise<"shared" | "copied" | "cancelled"> {
   const url = `${location.origin}/place/${place.id}`;
-  const text = `${place.name}${place.rating ? ` · ★ ${place.rating.toFixed(1)}` : ""} — found on Locali`;
+  const text = `${place.name}${place.rating ? ` · ★ ${place.rating.toFixed(1)}` : ""}, found on Locali 👉 ${url}`;
   try {
     if (navigator.share) {
-      await navigator.share({ title: place.name, text, url });
+      // Link inside the text too: some messengers drop the separate url field.
+      await navigator.share({ title: place.name, text });
       return "shared";
     }
-    await navigator.clipboard.writeText(`${text}\n${url}`);
+    await navigator.clipboard.writeText(text);
     return "copied";
   } catch {
     return "cancelled";
