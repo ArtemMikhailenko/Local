@@ -54,7 +54,7 @@ export function VoteBasketBar() {
   }
 
   return (
-    <div className={clsx("rise fixed inset-x-0 z-40 mx-auto max-w-[480px] px-3", path.startsWith("/place/") ? "bottom-[max(env(safe-area-inset-bottom),12px)]" : "bottom-[96px]")}>
+    <div className={clsx("rise fixed inset-x-0 z-40 mx-auto max-w-[480px] px-3", path.startsWith("/place/") ? "bottom-[max(env(safe-area-inset-bottom),12px)]" : "bottom-[calc(max(env(safe-area-inset-bottom),14px)+80px)]")}>
       <div className="card flex items-center gap-3 !rounded-full p-1.5 pl-2">
         <div className="flex -space-x-3">
           {basket.map((p: Place) => (
