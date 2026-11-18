@@ -75,6 +75,21 @@ export const sitePhotos = pgTable("site_photos", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Concierge conversations of signed-in users, synced across devices. */
+export const chats = pgTable(
+  "chats",
+  {
+    id: text("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    turns: jsonb("turns").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chats_user_idx").on(t.userId)],
+);
+
 export const conciergeRuns = pgTable(
   "concierge_runs",
   {

@@ -29,6 +29,13 @@
       "when": 1795012691045,
       "tag": "0003_site_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795016534317,
+      "tag": "0004_chats",
+      "breakpoints": true
     }
   ]
 }

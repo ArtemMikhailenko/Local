@@ -17,6 +17,11 @@ export async function createPoll(title: string, placeIds: string[]): Promise<str
   const res = await fetch("/api/polls", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, placeIds }) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data.error ?? "Could not create the vote");
+  // Remember votes created in this browser so they show up under Saved → Votes even without an account.
+  try {
+    const mine: string[] = JSON.parse(localStorage.getItem("locali:polls") ?? "[]");
+    localStorage.setItem("locali:polls", JSON.stringify([data.id, ...mine].slice(0, 30)));
+  } catch {}
   return data.id as string;
 }
 

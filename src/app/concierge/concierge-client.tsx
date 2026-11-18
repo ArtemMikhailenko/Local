@@ -29,9 +29,12 @@ function stepFrom(e: ConciergeEvent, tr: T): Step | null {
 
 const CURRENT_KEY = "locali:chat:current";
 const HISTORY_KEY = "locali:chat:history";
-type Chat = { id: string; title: string; at: number; turns: Turn[] };
+type Chat = { id: string; title: string; at: number | string; turns?: Turn[]; count?: number; remote?: boolean };
 
-/** Conversations live in this browser (localStorage): the current one is restored, older ones are archived. */
+/**
+ * Conversations: always kept in this browser (localStorage); for signed-in users also synced to
+ * their account (/api/chats), so history follows them across devices.
+ */
 const store = {
   read<T>(key: string, fallback: T): T {
     try {
@@ -47,8 +50,9 @@ const store = {
     } catch {}
   },
 };
-const finished = (turns: Turn[]) => turns.filter((t) => t.done).map((t) => ({ ...t, steps: [] }));
-
+/** Only answered turns are kept: failed attempts are not worth restoring. */
+const finished = (turns: Turn[]) => turns.filter((t) => t.done && (t.result || t.plan)).map((t) => ({ ...t, steps: [] }));
+const newChatId = () => Math.random().toString(36).slice(2, 12);
 function ConciergeInner() {
   const params = useSearchParams();
   const { center, toast, t: tr, lang } = useApp();
@@ -62,34 +66,69 @@ function ConciergeInner() {
   const started = useRef(false);
   const inFlight = useRef(false);
   const nextId = useRef(1);
+  const { user } = useApp();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Chat[]>([]);
+  const [chatId, setChatId] = useState<string>("");
   const restored = useRef(false);
 
-  // Restore the last conversation (unless we came with a new question or a vote link).
-  useEffect(() => {
-    setHistory(store.read<Chat[]>(HISTORY_KEY, []));
-    if (!params.get("q") && !params.get("poll")) {
-      const saved = store.read<Turn[]>(CURRENT_KEY, []);
-      if (saved.length) {
-        setTurns(saved);
-        nextId.current = Math.max(...saved.map((t) => t.id)) + 1;
-      }
+  async function loadHistory() {
+    const local = store.read<Chat[]>(HISTORY_KEY, []);
+    if (!user) return setHistory(local);
+    try {
+      const r = await fetch("/api/chats").then((x) => x.json());
+      const remote: Chat[] = (r.chats ?? []).map((c: Chat) => ({ ...c, remote: true }));
+      const ids = new Set(remote.map((c) => c.id));
+      setHistory([...remote, ...local.filter((c) => !ids.has(c.id))].filter((c) => c.id !== chatId));
+    } catch {
+      setHistory(local);
     }
+  }
+
+  // Restore the last conversation, or open one from ?chat= (unless we came with a new question or a vote link).
+  useEffect(() => {
+    const wanted = params.get("chat");
+    const cur = store.read<{ id?: string; turns?: Turn[] } | Turn[]>(CURRENT_KEY, []);
+    const current = Array.isArray(cur) ? { id: newChatId(), turns: cur } : { id: cur.id ?? newChatId(), turns: cur.turns ?? [] };
+    if (wanted) {
+      openChat({ id: wanted, title: "", at: 0, remote: true });
+    } else if (!params.get("q") && !params.get("poll") && current.turns.length) {
+      setTurns(finished(current.turns));
+      setChatId(current.id);
+      nextId.current = Math.max(0, ...current.turns.map((t) => t.id)) + 1;
+    } else setChatId(newChatId());
     restored.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (restored.current) store.write(CURRENT_KEY, finished(turns));
-  }, [turns]);
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  function archiveCurrent() {
-    const done = finished(turns);
-    if (!done.length) return history;
-    const chat: Chat = { id: String(Date.now()), title: done[0].prompt.slice(0, 80), at: Date.now(), turns: done };
-    const next = [chat, ...history].slice(0, 15);
-    store.write(HISTORY_KEY, next);
+  // Persist locally on every change; sync to the account once a turn is answered.
+  const done = finished(turns);
+  const doneKey = done.map((t) => t.id).join(",");
+  useEffect(() => {
+    if (!restored.current || !chatId) return;
+    store.write(CURRENT_KEY, { id: chatId, turns: done });
+    if (user && done.length) {
+      fetch(`/api/chats/${chatId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: done[0].prompt.slice(0, 120), turns: done }),
+      }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doneKey, chatId, user]);
+
+  function archiveCurrent(): Chat[] {
+    const d = finished(turns);
+    if (!d.length) return history;
+    const chat: Chat = { id: chatId, title: d[0].prompt.slice(0, 80), at: Date.now(), turns: d };
+    const local = [chat, ...store.read<Chat[]>(HISTORY_KEY, []).filter((h) => h.id !== chatId)].slice(0, 20);
+    store.write(HISTORY_KEY, local);
+    const next = [chat, ...history.filter((h) => h.id !== chatId)];
     setHistory(next);
     return next;
   }
@@ -98,15 +137,28 @@ function ConciergeInner() {
     if (busy) return;
     archiveCurrent();
     setTurns([]);
+    setChatId(newChatId());
   }
 
-  function openChat(c: Chat) {
+  async function openChat(c: Chat) {
     if (busy) return;
-    const rest = archiveCurrent().filter((h) => h.id !== c.id);
-    store.write(HISTORY_KEY, rest);
-    setHistory(rest);
-    setTurns(c.turns);
-    nextId.current = Math.max(0, ...c.turns.map((t) => t.id)) + 1;
+    let turnsToOpen = c.turns;
+    if (!turnsToOpen) {
+      const local = store.read<Chat[]>(HISTORY_KEY, []).find((h) => h.id === c.id);
+      turnsToOpen = local?.turns;
+    }
+    if (!turnsToOpen && user) {
+      try {
+        const r = await fetch(`/api/chats/${c.id}`).then((x) => x.json());
+        turnsToOpen = r.chat?.turns;
+      } catch {}
+    }
+    if (!turnsToOpen) return toast(lang === "uk" ? "Розмову не знайдено" : "Chat not found");
+    if (restored.current) archiveCurrent();
+    setTurns(turnsToOpen);
+    setChatId(c.id);
+    nextId.current = Math.max(0, ...turnsToOpen.map((t) => t.id)) + 1;
+    setHistory((h) => h.filter((x) => x.id !== c.id));
     setHistoryOpen(false);
   }
 
@@ -215,7 +267,7 @@ function ConciergeInner() {
                       <span className="block truncate text-[16px]">{c.title}</span>
                       <span className="block text-[13px] text-muted">
                         {new Date(c.at).toLocaleString(lang === "uk" ? "uk-UA" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} ·{" "}
-                        {tr("c.messages", { n: c.turns.length })}
+                        {tr("c.messages", { n: c.turns?.length ?? c.count ?? 0 })}
                       </span>
                     </span>
                     <span className="text-muted">→</span>
@@ -226,6 +278,7 @@ function ConciergeInner() {
             <button
               onClick={() => {
                 store.write(HISTORY_KEY, []);
+                if (user) history.filter((c) => c.remote).forEach((c) => fetch(`/api/chats/${c.id}`, { method: "DELETE" }).catch(() => {}));
                 setHistory([]);
                 setHistoryOpen(false);
               }}
