@@ -9,7 +9,7 @@ import { MapView } from "@/components/map-view";
 import { BasketButton } from "@/components/vote-basket";
 import { Photo, PlaceRow, SaveButton } from "@/components/place-bits";
 import { Mascot } from "@/components/mascot";
-import { categoryPhoto } from "@/lib/places/category-photos";
+import { placeholderFor } from "@/lib/places/category-photos";
 import { api, type SavedRow } from "@/lib/client/api";
 import type { LatLng } from "@/lib/geo";
 import { walkingRouteUrl } from "@/lib/route";
@@ -95,7 +95,7 @@ function VotesTab() {
               return (
                 <li key={e.id}>
                   <Link href={`/concierge?event=${e.id}`} className={past ? "card flex items-center gap-3 p-3 opacity-60" : "card flex items-center gap-3 p-3"}>
-                    <Photo src={e.place.photo ?? undefined} fallback={categoryPhoto(e.place.type, e.id)} alt={e.place.name} className="h-14 w-14 shrink-0 rounded-xl" />
+                    <Photo src={e.place.photo ?? undefined} fallback={placeholderFor(e.place.type)} alt={e.place.name} className="h-14 w-14 shrink-0 rounded-xl" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[16px] font-semibold">{e.title}</div>
                       <div className="truncate text-[13px] text-muted">
@@ -119,7 +119,7 @@ function VotesTab() {
                 <Link href={`/concierge?poll=${p.id}`} className="card flex items-center gap-3 p-3 transition active:scale-[0.99]">
                   <div className="flex -space-x-4">
                     {p.options.slice(0, 3).map((o, i) => (
-                      <Photo key={i} src={o.photo ?? undefined} fallback={categoryPhoto("restaurant", o.name)} alt={o.name} className="h-12 w-12 rounded-full ring-2 ring-white" />
+                      <Photo key={i} src={o.photo ?? undefined} fallback={placeholderFor("restaurant")} alt={o.name} className="h-12 w-12 rounded-full ring-2 ring-white" />
                     ))}
                   </div>
                   <div className="min-w-0 flex-1">

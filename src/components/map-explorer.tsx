@@ -119,7 +119,7 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
           events.map((e) => (
             <div key={e.id} data-id={e.id} onClick={() => setActive(e.id)} className={clsx("card w-[86%] shrink-0 snap-center p-3 transition", e.id === active ? "ring-2 ring-accent" : "opacity-95")}>
               <div className="flex gap-3">
-                <Photo src={e.place.photo ?? undefined} fallback={fallbackFor({ ...e.place, photos: [], photosIllustrative: true } as unknown as Place)} alt={e.place.name} className="h-20 w-20 shrink-0 rounded-xl" />
+                <Photo src={e.place.photo ?? undefined} fallback={fallbackFor(e.place)} alt={e.place.name} className="h-20 w-20 shrink-0 rounded-xl" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1 text-[12px] font-semibold text-accent"><Glyph name="event" className="h-4 w-4" />{fmtWhen(e.startsAt, lang)}</div>
                   <div className="display-soft truncate text-[16px]">{e.title}</div>

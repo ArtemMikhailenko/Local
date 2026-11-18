@@ -17,18 +17,19 @@ const notFound = (reason: string, maxAge = 600) =>
 
 /** Find the outdoor panorama closest to the venue (free metadata call) and remember it. */
 async function lookup(at: { lat: number; lng: number }) {
-  const key = viewKey(at);
+  const key = `g2:${viewKey(at)}`; // g2: Google-only imagery within 35 m
   const [row] = await db.select().from(schema.streetViews).where(eq(schema.streetViews.key, key)).limit(1);
   if (row && (row.status === "ok" || Date.now() - row.checkedAt.getTime() < NONE_RETRY_MS)) return row;
 
   const res = await fetch(
-    `https://maps.googleapis.com/maps/api/streetview/metadata?location=${at.lat},${at.lng}&radius=60&source=outdoor&key=${env.googlePlacesKey}`,
+    `https://maps.googleapis.com/maps/api/streetview/metadata?location=${at.lat},${at.lng}&radius=35&source=outdoor&key=${env.googlePlacesKey}`,
     { cache: "no-store", signal: AbortSignal.timeout(6000) },
   );
-  const meta = (await res.json().catch(() => ({}))) as { status?: string; pano_id?: string; location?: { lat: number; lng: number } };
+  const meta = (await res.json().catch(() => ({}))) as { status?: string; pano_id?: string; copyright?: string; location?: { lat: number; lng: number } };
   // Anything other than OK / ZERO_RESULTS (e.g. the API is not enabled) is not remembered.
   if (meta.status !== "OK" && meta.status !== "ZERO_RESULTS") throw new Error(`meta-${meta.status ?? res.status}`);
-  const ok = meta.status === "OK" && meta.pano_id && PANO_ID_RE.test(meta.pano_id) && meta.location;
+  // Only Google's own car imagery: user photospheres are often taken inside some other venue.
+  const ok = meta.status === "OK" && meta.pano_id && PANO_ID_RE.test(meta.pano_id) && meta.location && /google/i.test(meta.copyright ?? "");
   const value = {
     key,
     panoId: ok ? meta.pano_id! : null,
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
     if (view.status !== "ok" || !view.panoId) return notFound("no-pano", 86_400);
     if (!(await takeQuota())) return notFound("daily-limit", 600);
     const img = await fetch(
-      `https://maps.googleapis.com/maps/api/streetview?size=640x480&pano=${view.panoId}&heading=${view.heading ?? 0}&fov=80&pitch=5&return_error_code=true&key=${env.googlePlacesKey}`,
+      `https://maps.googleapis.com/maps/api/streetview?size=640x480&pano=${view.panoId}&heading=${view.heading ?? 0}&fov=70&pitch=8&return_error_code=true&key=${env.googlePlacesKey}`,
       { cache: "no-store", signal: AbortSignal.timeout(8000) },
     );
     const type = img.headers.get("content-type") ?? "";

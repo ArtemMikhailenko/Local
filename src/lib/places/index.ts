@@ -5,7 +5,7 @@ import { distanceMeters, type LatLng } from "@/lib/geo";
 import { env, placesMode } from "@/lib/env";
 import { createOsmProvider, geoapifyTransport, overpassTransport, type FetchArea, type OsmVenue } from "./osm";
 import { createDemoProvider } from "./demo";
-import { fetchSitePhoto } from "./site-photo";
+import { fetchSitePhoto, isUsableShareImage } from "./site-photo";
 import { createGoogleProvider } from "./google";
 import type { Place, PlacesProvider, SearchParams } from "./types";
 
@@ -92,7 +92,8 @@ function withSitePhotos(inner: PlacesProvider): PlacesProvider {
     if (!missing.length) return;
     try {
       const rows = await db.select().from(schema.sitePhotos).where(inArray(schema.sitePhotos.placeId, missing));
-      rows.forEach((r) => known.set(r.placeId, r.url));
+      // Re-check stored URLs: rows saved before the avatar/logo filter existed may hold bad images.
+      rows.forEach((r) => known.set(r.placeId, r.url && isUsableShareImage(r.url) ? r.url : null));
     } catch {}
   };
 

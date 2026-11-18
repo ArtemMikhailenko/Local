@@ -8,7 +8,7 @@ import { IconArrow, IconBack, IconShare } from "@/components/icons";
 import { MapView } from "@/components/map-view";
 import { BasketButton } from "@/components/vote-basket";
 import { CreateEventButton } from "@/components/event";
-import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel, fallbackFor, streetPhoto } from "@/components/place-bits";
+import { OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel, fallbackFor, streetPhoto } from "@/components/place-bits";
 import { api, ApiError, placeCache } from "@/lib/client/api";
 import { rememberViewed, sharePlace } from "@/lib/client/extras";
 import type { Place } from "@/lib/places/types";
@@ -101,7 +101,7 @@ export function PlaceClient({ id }: { id: string }) {
           </div>
         </div>
         <div className="absolute inset-x-3 bottom-3 flex items-center justify-between">
-          {place.photosIllustrative ? <IllustrativeTag /> : <span />}
+          <span />
           {photos.length > 1 && (
             <span className="rounded-full bg-black/50 px-2 py-0.5 text-[11px] font-medium text-white">
               {pad2(slide + 1)} / {pad2(photos.length)}

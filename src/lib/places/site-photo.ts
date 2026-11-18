@@ -37,6 +37,24 @@ async function assertPublicHost(url: URL) {
 }
 
 /** Pulls og:image / twitter:image / image_src out of HTML and resolves it against the page URL. */
+/**
+ * A share image good enough to stand for the venue: not a logo or icon, and not a social profile
+ * avatar (Instagram/Facebook "websites" give a 150 px profile picture, not the place).
+ */
+export function isUsableShareImage(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (/\.(svg|ico|gif)(\?|$)/i.test(u.pathname)) return false;
+    if (/logo|favicon|icon|avatar|profile|placeholder|default/i.test(u.pathname)) return false;
+    if (/(^|\.)(cdninstagram\.com|fbcdn\.net|fbsbx\.com|tiktokcdn\.com|googleusercontent\.com|gstatic\.com)$/i.test(u.hostname)) return false;
+    if (/(^|\.)(unsplash\.com|pexels\.com|shutterstock\.com|istockphoto\.com|freepik\.com|depositphotos\.com)$/i.test(u.hostname)) return false; // stock, not the venue
+    if (/[_-]s?(\d{2,3})x\1\b|s150x150|\b(32|48|64|96|120|150|180|192)x\1\b/i.test(u.pathname + u.search)) return false; // tiny square thumbnails
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function extractShareImage(html: string, pageUrl: string): string | null {
   const head = html.slice(0, 200_000);
   const patterns = [
@@ -53,7 +71,7 @@ export function extractShareImage(html: string, pageUrl: string): string | null 
       const u = new URL(m[1].replace(/&amp;/g, "&").trim(), pageUrl);
       if (u.protocol === "http:") u.protocol = "https:"; // the app is served over https
       if (u.protocol !== "https:") continue;
-      if (/\.(svg|ico)(\?|$)/i.test(u.pathname) || /logo|favicon|icon/i.test(u.pathname)) continue; // logos look bad as cover photos
+      if (!isUsableShareImage(u.toString())) continue;
       return u.toString();
     } catch {}
   }

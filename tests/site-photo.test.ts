@@ -37,3 +37,29 @@ describe("venue website photos", () => {
     expect(await fetchSitePhoto("https://8.8.8.8/", page as unknown as typeof fetch)).toBe("https://8.8.8.8/hall.jpg");
   });
 });
+
+import { isUsableShareImage } from "@/lib/places/site-photo";
+import { placeholderFor, placeholderKind } from "@/lib/places/category-photos";
+
+describe("which images may stand for a venue", () => {
+  it("rejects social profile avatars, logos and tiny thumbnails", () => {
+    expect(isUsableShareImage("https://scontent-iev1-1.cdninstagram.com/v/t51/abc.jpg?stp=dst-jpg_s150x150")).toBe(false);
+    expect(isUsableShareImage("https://static.xx.fbcdn.net/rsrc/photo.jpg")).toBe(false);
+    expect(isUsableShareImage("https://cafe.ua/img/logo-dark.png")).toBe(false);
+    expect(isUsableShareImage("https://cafe.ua/img/hero_150x150.jpg")).toBe(false);
+    expect(isUsableShareImage("https://images.unsplash.com/photo-123?w=1200")).toBe(false);
+  });
+  it("keeps a normal photo from the venue's own site", () => {
+    expect(isUsableShareImage("https://cafe.ua/uploads/2024/terrace.jpg")).toBe(true);
+  });
+});
+
+describe("illustrated tiles instead of stock photos", () => {
+  it("picks an icon by venue type", () => {
+    expect(placeholderKind("Wine bar")).toBe("wine");
+    expect(placeholderKind("Café")).toBe("coffee");
+    expect(placeholderKind("Cocktail bar")).toBe("bars");
+    expect(placeholderKind("Georgian restaurant")).toBe("dinner");
+    expect(placeholderFor("Museum")).toBe("placeholder:culture");
+  });
+});

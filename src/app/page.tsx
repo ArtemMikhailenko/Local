@@ -17,7 +17,7 @@ import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 import { weatherIcon, type Weather } from "@/lib/weather";
 import type { Key } from "@/lib/i18n";
-import { categoryPhoto } from "@/lib/places/category-photos";
+import { placeholderFor } from "@/lib/places/category-photos";
 
 
 const greetingKey = (h: number) => (h < 5 ? "greet.night" : h < 12 ? "greet.morning" : h < 18 ? "greet.afternoon" : "greet.evening");
@@ -220,7 +220,7 @@ export default function Discover() {
           <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4">
             {viewed.map((v) => (
               <Link key={v.id} href={`/place/${v.id}`} className="w-[116px] shrink-0">
-                <Photo src={v.photo} fallback={categoryPhoto(v.type, v.id)} alt={v.name} className="aspect-square w-full rounded-2xl" />
+                <Photo src={v.photo} fallback={placeholderFor(v.type)} alt={v.name} className="aspect-square w-full rounded-2xl" />
                 <div className="mt-2 truncate text-[14px] font-semibold">{v.name}</div>
                 <div className="truncate text-[12px] text-muted">{v.type}</div>
               </Link>

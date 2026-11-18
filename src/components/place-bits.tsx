@@ -5,7 +5,8 @@ import Link from "next/link";
 import clsx from "clsx";
 import { haptic } from "@/lib/client/extras";
 import { distanceMeters, formatDistance, walkingMinutes, type LatLng } from "@/lib/geo";
-import { categoryPhoto } from "@/lib/places/category-photos";
+import { placeholderFor } from "@/lib/places/category-photos";
+import { Glyph } from "./glyph";
 import type { Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
 import { IconHeart, IconStar, IconWalk } from "./icons";
@@ -89,16 +90,30 @@ export function IllustrativeTag({ className }: { className?: string }) {
  */
 export function Photo({ src, alt, className, fallback }: { src?: string; alt: string; className?: string; fallback?: string | string[] }) {
   const [failed, setFailed] = useState(0);
-  const chain = [...new Set([src, ...(Array.isArray(fallback) ? fallback : fallback ? [fallback] : [])].filter(Boolean) as string[])];
-  const url = chain[failed];
-  if (!url) return <div className={clsx("bg-surface-2", className)} />;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img key={url} src={url} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed((f) => f + 1)} className={clsx("object-cover", className)} />;
+  // Stock photos (old cached data, or a venue site using one) never stand in for the real place.
+  const chain = [...new Set([src, ...(Array.isArray(fallback) ? fallback : fallback ? [fallback] : [])].filter((u): u is string => !!u && !/images\.unsplash\.com|pexels\.com/.test(u)))];
+  const url = chain[failed] ?? "placeholder:dinner";
+  if (url.startsWith("placeholder:")) {
+    // Honest illustrated tile instead of a stock photo that could pass for the venue.
+    return (
+      <div role="img" aria-label={alt} className={clsx("relative grid place-items-center overflow-hidden bg-gradient-to-br from-[#ffe9e3] to-[#fbd3c8]", className)}>
+        <Glyph name={url.slice(12)} className="h-[38%] max-h-24 w-[38%] max-w-24 text-accent/80" />
+      </div>
+    );
+  }
+  const street = url.startsWith("/api/street-photo");
+  return (
+    <div className={clsx("relative overflow-hidden", className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img key={url} src={url} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed((f) => f + 1)} className="h-full w-full object-cover" />
+      {street && <IllustrativeTag className="absolute bottom-2 left-2" />}
+    </div>
+  );
 }
 
-export const streetPhoto = (p: Place) => `/api/street-photo?lat=${p.location.lat.toFixed(6)}&lng=${p.location.lng.toFixed(6)}`;
-/** When the venue photo fails (e.g. Google photo quota is used up): Street View of the entrance, then a category photo. The venue photo stays first, so it comes back as soon as quota does. */
-export const fallbackFor = (p: Place) => [streetPhoto(p), categoryPhoto(p.type, p.id)];
+export const streetPhoto = (p: Pick<Place, "location">) => `/api/street-photo?lat=${p.location.lat.toFixed(6)}&lng=${p.location.lng.toFixed(6)}`;
+/** When the venue photo fails (e.g. Google photo quota is used up): Street View of the entrance, then an illustrated tile. The venue photo stays first, so it comes back as soon as quota does. */
+export const fallbackFor = (p: Pick<Place, "type" | "location">) => [streetPhoto(p), placeholderFor(p.type)];
 /** For venues whose own photo is just an illustration, try the real street photo first. */
 export const coverOf = (p: Place) => (p.photosIllustrative ? streetPhoto(p) : p.photos[0]);
 
@@ -109,7 +124,6 @@ export function PlaceCard({ place, center }: { place: Place; center: LatLng; ind
       <div className="relative overflow-hidden rounded-[20px] bg-surface-2">
         <Photo src={coverOf(place)} fallback={[...fallbackFor(place), place.photos[0]]} alt={place.name} className="aspect-[4/5] w-full transition duration-500 group-hover:scale-[1.03]" />
         <SaveButton placeId={place.id} className="absolute right-3 top-3" />
-        {place.photosIllustrative && <IllustrativeTag className="absolute bottom-3 left-3" />}
       </div>
       <div className="px-1 pt-3">
         <h3 className="display-soft truncate text-[17px]">{place.name}</h3>

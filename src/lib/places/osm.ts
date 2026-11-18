@@ -6,23 +6,13 @@ import type { Place, PlacesProvider } from "./types";
  * Real venues from OpenStreetMap. Two transports share one normalizer (OSM tags → Place):
  *  - Geoapify Places API (fast, free key, no card) when GEOAPIFY_API_KEY is set;
  *  - the public Overpass API otherwise (no key, slower, so results are cached per area).
- * OSM has no ratings or venue photos: rating stays null and cards use category photos
+ * OSM has no ratings or venue photos: rating stays null and cards use the venue's site photo, Street View or an illustrated tile
  * that are clearly marked as illustrative.
  */
 
 export type OsmTags = Record<string, string>;
 export type OsmVenue = { id: string; lat: number; lng: number; tags: OsmTags };
 
-const img = (id: string) => `https://images.unsplash.com/photo-${id}?w=1200&q=70&auto=format&fit=crop`;
-const CATEGORY_PHOTOS: Record<string, string[]> = {
-  cafe: ["1554118811-1e0d58224f24", "1501339847302-ac426a4a7cbb", "1495474472287-4d71bcdd2085", "1509042239860-f550ce710b93", "1442512595331-e89e73853f31"],
-  restaurant: ["1414235077428-338989a2e8c0", "1517248135467-4c7edcad34c4", "1555396273-367ea4eb4db5", "1559339352-11d035aa65de", "1424847651672-bf20a4b0982b"],
-  bar: ["1514933651103-005eec06c04b", "1470337458703-46ad1756a187", "1572116469696-31de0f17cc34", "1510812431401-41d2bd2722f3"],
-  pub: ["1436076863939-06870fe779c2", "1518176258769-f227c798150e"],
-  ice_cream: ["1551024601-bec78aea704b", "1488477181946-6428a0291777"],
-  museum: ["1518998053901-5348d3961a04", "1566127444979-b3d2b654e3d7"],
-  gallery: ["1554907984-15263bfd63bd", "1536924940846-227afb31e2a5"],
-};
 
 const KIND_LABEL: Record<string, string> = {
   cafe: "Café",
@@ -137,12 +127,6 @@ export function openAtFromHours(spec: string | undefined, now: Date, timeZone: s
   }
 }
 
-function hash(s: string): number {
-  let h = 0;
-  for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h;
-}
-
 export function normalizeOsm(v: OsmVenue, now: Date, timeZone: string): Place {
   const t = v.tags;
   const kind = kindOf(t);
@@ -150,8 +134,6 @@ export function normalizeOsm(v: OsmVenue, now: Date, timeZone: string): Place {
   const rawCuisine = t.cuisine?.split(";")[0]?.trim() ?? "";
   const cuisine = /^[a-z_ ]+$/.test(rawCuisine) ? rawCuisine.replace(/_/g, " ") : undefined;
   const type = cuisine && kind === "restaurant" ? `${cuisine[0].toUpperCase()}${cuisine.slice(1)} restaurant` : KIND_LABEL[kind] ?? "Place";
-  const photos = CATEGORY_PHOTOS[kind] ?? CATEGORY_PHOTOS.restaurant;
-  const start = hash(v.id) % photos.length;
   const facts = [
     t.outdoor_seating === "yes" && "outdoor seating",
     t.internet_access && t.internet_access !== "no" && "Wi-Fi",
@@ -173,7 +155,8 @@ export function normalizeOsm(v: OsmVenue, now: Date, timeZone: string): Place {
     location: { lat: v.lat, lng: v.lng },
     openNow: openNowFromHours(t.opening_hours, now, timeZone),
     hours: t.opening_hours ? t.opening_hours.split(/\s*;\s*/) : [],
-    photos: [photos[start], photos[(start + 1) % photos.length]].map(img),
+    // No stock photos: the UI shows the venue's site photo, Street View, or an illustrated tile.
+    photos: [],
     photosIllustrative: true,
     summary,
     website: website && /^https?:\/\//i.test(website) ? website : null,
