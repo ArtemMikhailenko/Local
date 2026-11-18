@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   const at = parseLatLng(url.searchParams.get("lat"), url.searchParams.get("lng"));
   if (!at) return notFound("bad-coords");
 
-  const d = 0.0004; // ~45 m
+  const d = 0.0011; // ~120 m: central Kyiv coverage is sparse
   const bbox = [at.lng - d, at.lat - d, at.lng + d, at.lat + d].map((n) => n.toFixed(6)).join(",");
   try {
     const res = await fetch(
@@ -30,20 +30,28 @@ export async function GET(req: Request) {
     if (!res.ok) return notFound(`mapillary-${res.status}`);
     const { data } = (await res.json()) as { data?: MlyImage[] };
     // The bbox search returns positions only; thumbnails come from a per-image lookup.
-    const best = (data ?? [])
+    const ranked = (data ?? [])
       .map((i) => ({ i, geo: (i.computed_geometry ?? i.geometry)?.coordinates }))
       .filter((x) => x.geo)
       .map((x) => ({ ...x, dist: distanceMeters(at, { lng: x.geo![0], lat: x.geo![1] }) + (x.i.is_pano ? 30 : 0) }))
-      .sort((a, b) => a.dist - b.dist)[0];
-    if (!best) return notFound(`no-images-${(data ?? []).length}`);
-    const one = await fetch(`https://graph.mapillary.com/${best.i.id}?access_token=${encodeURIComponent(token)}&fields=thumb_1024_url,thumb_original_url`, {
-      next: { revalidate: 1_800 },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!one.ok) return notFound(`thumb-${one.status}`);
-    const img = (await one.json()) as { thumb_1024_url?: string; thumb_original_url?: string };
-    const thumb = img.thumb_1024_url ?? img.thumb_original_url;
-    if (!thumb?.startsWith("https://")) return notFound("no-thumb");
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 3);
+    if (!ranked.length) return notFound(`no-images-${(data ?? []).length}`);
+    let thumb: string | undefined;
+    let why = "";
+    for (const cand of ranked) {
+      const one = await fetch(`https://graph.mapillary.com/${cand.i.id}?access_token=${encodeURIComponent(token)}&fields=id,thumb_1024_url,thumb_2048_url,thumb_256_url,thumb_original_url`, {
+        next: { revalidate: 1_800 },
+        signal: AbortSignal.timeout(8000),
+      });
+      const body = (await one.json().catch(() => ({}))) as Record<string, unknown>;
+      thumb = [body.thumb_1024_url, body.thumb_2048_url, body.thumb_original_url, body.thumb_256_url].find((u): u is string => typeof u === "string" && u.startsWith("https://"));
+      if (thumb) break;
+      // Diagnostics: what Mapillary sent instead of a thumbnail (keys and error message only, no URLs).
+      const err = (body.error as { message?: string; code?: number } | undefined) ?? undefined;
+      why = `${one.status}:${Object.keys(body).join("+")}${err ? `:${err.code ?? ""}:${(err.message ?? "").slice(0, 80)}` : ""}`;
+    }
+    if (!thumb) return notFound(`no-thumb-${why}`.replace(/[^\x20-\x7e]/g, ""));
     return new Response(null, { status: 302, headers: { Location: thumb, "Cache-Control": "public, max-age=1800" } });
   } catch (e) {
     return notFound(`error-${e instanceof Error ? e.name : "unknown"}`);
