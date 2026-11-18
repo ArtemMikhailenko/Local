@@ -40,7 +40,9 @@ export async function GET(req: Request) {
     let thumb: string | undefined;
     let why = "";
     for (const cand of ranked) {
-      const one = await fetch(`https://graph.mapillary.com/${cand.i.id}?access_token=${encodeURIComponent(token)}&fields=id,thumb_1024_url,thumb_2048_url,thumb_256_url,thumb_original_url`, {
+      // Mapillary documents both styles; image fields are sometimes only returned with the OAuth header.
+      const one = await fetch(`https://graph.mapillary.com/${cand.i.id}?fields=id,thumb_1024_url,thumb_2048_url,thumb_256_url,thumb_original_url`, {
+        headers: { Authorization: `OAuth ${token}` },
         next: { revalidate: 1_800 },
         signal: AbortSignal.timeout(8000),
       });
