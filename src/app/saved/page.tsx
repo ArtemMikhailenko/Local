@@ -59,42 +59,83 @@ function SavedItem({ row, center, index }: { row: SavedRow; center: LatLng; inde
 type PollRow = { id: string; title: string; createdAt: string; active: boolean; total: number; leader: { name: string; photo: string | null } | null; options: Array<{ name: string; photo: string | null }> };
 type ChatRow = { id: string; title: string; at: number | string; count?: number; turns?: unknown[] };
 
+type EventRow = { id: string; title: string; startsAt: string; going: number; place: { name: string; photo: string | null; type: string } };
+
 function VotesTab() {
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const [polls, setPolls] = useState<PollRow[] | null>(null);
+  const [events, setEvents] = useState<EventRow[] | null>(null);
   useEffect(() => {
-    let ids = "";
-    try {
-      ids = (JSON.parse(localStorage.getItem("locali:polls") ?? "[]") as string[]).join(",");
-    } catch {}
-    fetch(`/api/polls/mine?ids=${encodeURIComponent(ids)}`)
+    const local = (key: string) => {
+      try {
+        return (JSON.parse(localStorage.getItem(key) ?? "[]") as string[]).join(",");
+      } catch {
+        return "";
+      }
+    };
+    fetch(`/api/polls/mine?ids=${encodeURIComponent(local("locali:polls"))}`)
       .then((r) => r.json())
       .then((d) => setPolls(d.polls ?? []))
       .catch(() => setPolls([]));
+    fetch(`/api/events/mine?ids=${encodeURIComponent(local("locali:events"))}`)
+      .then((r) => r.json())
+      .then((d) => setEvents(d.events ?? []))
+      .catch(() => setEvents([]));
   }, []);
-  if (polls === null) return <div className="skeleton mt-4 h-24" />;
-  if (!polls.length) return <p className="mt-6 rounded-2xl bg-canvas p-6 text-muted">{t("saved.votes.empty")}</p>;
+  if (polls === null || events === null) return <div className="skeleton mt-4 h-24" />;
+  if (!polls.length && !events.length) return <p className="mt-6 rounded-2xl bg-canvas p-6 text-muted">{t("saved.votes.empty")}</p>;
   return (
-    <ul className="mt-4 space-y-3">
-      {polls.map((p) => (
-        <li key={p.id}>
-          <Link href={`/concierge?poll=${p.id}`} className="card flex items-center gap-3 p-3 transition active:scale-[0.99]">
-            <div className="flex -space-x-4">
-              {p.options.slice(0, 3).map((o, i) => (
-                <Photo key={i} src={o.photo ?? undefined} fallback={categoryPhoto("restaurant", o.name)} alt={o.name} className="h-12 w-12 rounded-full ring-2 ring-white" />
-              ))}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[16px] font-semibold">{p.title}</div>
-              <div className="truncate text-[13px] text-muted">{p.leader ? t("saved.votes.leading", { name: p.leader.name }) : p.total ? `${p.total}` : t("saved.votes.noVotes")}</div>
-            </div>
-            <span className={p.active ? "rounded-full bg-accent-soft px-2.5 py-1 text-[12px] font-semibold text-accent" : "rounded-full bg-canvas px-2.5 py-1 text-[12px] font-semibold text-muted"}>
-              {p.active ? t("saved.votes.active") : t("saved.votes.ended")} · {p.total}
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      {events.length > 0 && (
+        <section className="mt-5">
+          <h2 className="display text-[18px]">{t("saved.events")}</h2>
+          <ul className="mt-2 space-y-3">
+            {events.map((e) => {
+              const past = new Date(e.startsAt).getTime() < Date.now() - 3 * 3600_000;
+              return (
+                <li key={e.id}>
+                  <Link href={`/concierge?event=${e.id}`} className={past ? "card flex items-center gap-3 p-3 opacity-60" : "card flex items-center gap-3 p-3"}>
+                    <Photo src={e.place.photo ?? undefined} fallback={categoryPhoto(e.place.type, e.id)} alt={e.place.name} className="h-14 w-14 shrink-0 rounded-xl" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[16px] font-semibold">{e.title}</div>
+                      <div className="truncate text-[13px] text-muted">
+                        {new Date(e.startsAt).toLocaleString(lang === "uk" ? "uk-UA" : "en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {e.place.name}
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[12px] font-semibold text-accent">{t("ev.goingCount", { n: e.going })}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {polls.length > 0 && (
+        <section className="mt-6">
+          <h2 className="display text-[18px]">{t("saved.polls")}</h2>
+          <ul className="mt-2 space-y-3">
+            {polls.map((p) => (
+              <li key={p.id}>
+                <Link href={`/concierge?poll=${p.id}`} className="card flex items-center gap-3 p-3 transition active:scale-[0.99]">
+                  <div className="flex -space-x-4">
+                    {p.options.slice(0, 3).map((o, i) => (
+                      <Photo key={i} src={o.photo ?? undefined} fallback={categoryPhoto("restaurant", o.name)} alt={o.name} className="h-12 w-12 rounded-full ring-2 ring-white" />
+                    ))}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[16px] font-semibold">{p.title}</div>
+                    <div className="truncate text-[13px] text-muted">{p.leader ? t("saved.votes.leading", { name: p.leader.name }) : t("saved.votes.noVotes")}</div>
+                  </div>
+                  <span className={p.active ? "rounded-full bg-accent-soft px-2.5 py-1 text-[12px] font-semibold text-accent" : "rounded-full bg-canvas px-2.5 py-1 text-[12px] font-semibold text-muted"}>
+                    {p.active ? t("saved.votes.active") : t("saved.votes.ended")} · {p.total}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }
 

@@ -99,3 +99,21 @@ describe("realistic evening plans", () => {
     expect(new URL(walkingRouteUrl(start, [near, far])!).searchParams.get("travelmode")).toBe("transit");
   });
 });
+
+import { summarize, toIcs } from "@/lib/events";
+
+describe("events", () => {
+  it("groups RSVPs by answer", () => {
+    expect(summarize([{ name: "Ann", status: "going" }, { name: "Bo", status: "maybe" }, { name: "Cy", status: "going" }])).toEqual({ going: ["Ann", "Cy"], maybe: ["Bo"], no: [] });
+  });
+
+  it("builds a valid calendar file with escaped text and the venue location", () => {
+    const place = { id: "x", name: "Café, Kyiv; Podil", address: "Sahaidachnoho 1", location: { lat: 50.46, lng: 30.51 } } as never;
+    const ics = toIcs({ id: "abc123def456", title: "Dinner", place, startsAt: new Date("2026-11-20T18:00:00Z"), note: "Book a table\nnear the window", url: "https://x.app/e" });
+    expect(ics).toContain("DTSTART:20261120T180000Z");
+    expect(ics).toContain("DTEND:20261120T200000Z");
+    expect(ics).toContain("LOCATION:Café\\, Kyiv\\; Podil\\, Sahaidachnoho 1");
+    expect(ics).toContain("DESCRIPTION:Book a table\\nnear the window\\nhttps://x.app/e");
+    expect(ics.split("\r\n")[0]).toBe("BEGIN:VCALENDAR");
+  });
+});

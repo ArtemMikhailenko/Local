@@ -7,6 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { IconArrow, IconBack, IconShare } from "@/components/icons";
 import { MapView } from "@/components/map-view";
 import { BasketButton } from "@/components/vote-basket";
+import { CreateEventButton } from "@/components/event";
 import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel, fallbackFor, streetPhoto } from "@/components/place-bits";
 import { api, ApiError, placeCache } from "@/lib/client/api";
 import { rememberViewed, sharePlace } from "@/lib/client/extras";
@@ -137,7 +138,10 @@ export function PlaceClient({ id }: { id: string }) {
           </Link>
         </div>
 
-        <BasketButton place={place} className="mt-2 w-full" />
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <CreateEventButton place={place} className="!px-3 !text-[14px]" />
+          <BasketButton place={place} className="!px-3 !text-[14px]" />
+        </div>
 
         <dl className="mt-8 rounded-2xl bg-canvas px-4">
           {place.address && <Row label={t("place.address")}>{place.address}</Row>}

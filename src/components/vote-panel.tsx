@@ -7,6 +7,7 @@ import { ApiError } from "@/lib/client/api";
 import type { Place } from "@/lib/places/types";
 import type { Tally } from "@/lib/polls";
 import { useApp } from "./app-provider";
+import { CreateEventSheet } from "./event";
 import { IconShare } from "./icons";
 import { Photo, coverOf, fallbackFor } from "./place-bits";
 
@@ -49,6 +50,7 @@ export function VotePanel({ pollId }: { pollId: string }) {
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [eventOpen, setEventOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -153,6 +155,12 @@ export function VotePanel({ pollId }: { pollId: string }) {
           </Link>
         )}
       </div>
+      {poll.leader && (
+        <button onClick={() => setEventOpen(true)} className="flex h-11 w-full items-center justify-center rounded-full bg-text text-[15px] font-semibold text-white">
+          🗓 {t("ev.fromVote")}
+        </button>
+      )}
+      {poll.leader && <CreateEventSheet place={poll.places.find((p) => p.id === poll.leader)!} open={eventOpen} onClose={() => setEventOpen(false)} />}
     </div>
   );
 }

@@ -90,6 +90,31 @@ export const chats = pgTable(
   (t) => [index("chats_user_idx").on(t.userId)],
 );
 
+/** A meetup at a place: shareable invite with RSVPs (no account needed to answer). */
+export const events = pgTable("events", {
+  id: text("id").primaryKey(), // 12-char random slug
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  place: jsonb("place").$type<Place>().notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const eventRsvps = pgTable(
+  "event_rsvps",
+  {
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    voterId: text("voter_id").notNull(), // same anonymous per-browser cookie as votes
+    name: text("name").notNull(),
+    status: text("status").$type<"going" | "maybe" | "no">().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.voterId] })],
+);
+
 export const conciergeRuns = pgTable(
   "concierge_runs",
   {

@@ -5,8 +5,22 @@ import { POLL_ID_RE } from "@/lib/polls";
 import { ConciergeClient } from "./concierge-client";
 
 /** Vote links get a proper preview in messengers: title, the options and the first venue photo. */
-export async function generateMetadata({ searchParams }: { searchParams: Promise<{ poll?: string }> }): Promise<Metadata> {
-  const { poll } = await searchParams;
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ poll?: string; event?: string }> }): Promise<Metadata> {
+  const { poll, event } = await searchParams;
+  if (event && POLL_ID_RE.test(event)) {
+    try {
+      const [ev] = await db.select().from(schema.events).where(eq(schema.events.id, event)).limit(1);
+      if (ev) {
+        const when = ev.startsAt.toLocaleString("uk-UA", { timeZone: "Europe/Kyiv", weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+        const image = ev.place.photos[0];
+        return {
+          title: `🗓 ${ev.title}`,
+          description: `${ev.place.name} · ${when}. Tap to answer: going, maybe or can't.`,
+          openGraph: { title: `🗓 ${ev.title}`, description: `${ev.place.name} · ${when}`, images: image ? [image] : undefined },
+        };
+      }
+    } catch {}
+  }
   if (!poll || !POLL_ID_RE.test(poll)) return { title: "Lumi · your concierge" };
   try {
     const [row] = await db

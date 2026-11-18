@@ -9,6 +9,7 @@ import { IconArrow, IconRoute, IconShare } from "@/components/icons";
 import { PlanTimeline } from "@/components/plan-timeline";
 import { VoiceButton } from "@/components/voice-button";
 import { VotePanel, createPoll, sharePoll } from "@/components/vote-panel";
+import { EventPanel } from "@/components/event";
 import { walkingRouteUrl } from "@/lib/route";
 import { IllustrativeTag, Meta, Photo, SaveButton, coverOf, fallbackFor } from "@/components/place-bits";
 import type { ConciergeEvent } from "@/lib/concierge/agent";
@@ -59,6 +60,7 @@ function ConciergeInner() {
   const SUGGESTIONS = tr("c.suggestions").split("|");
   const REFINE = tr("c.refine").split("|");
   const pollParam = params.get("poll");
+  const eventParam = params.get("event");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const busy = turns.some((t) => !t.done);
@@ -92,7 +94,7 @@ function ConciergeInner() {
     const current = Array.isArray(cur) ? { id: newChatId(), turns: cur } : { id: cur.id ?? newChatId(), turns: cur.turns ?? [] };
     if (wanted) {
       openChat({ id: wanted, title: "", at: 0, remote: true });
-    } else if (!params.get("q") && !params.get("poll") && current.turns.length) {
+    } else if (!params.get("q") && !params.get("poll") && !params.get("event") && current.turns.length) {
       setTurns(finished(current.turns));
       setChatId(current.id);
       nextId.current = Math.max(0, ...current.turns.map((t) => t.id)) + 1;
@@ -290,7 +292,12 @@ function ConciergeInner() {
         </div>
       )}
 
-      {pollParam && turns.length === 0 ? (
+      {eventParam && turns.length === 0 ? (
+        <section className="flex-1 pb-24 pt-6">
+          <EventPanel eventId={eventParam} />
+          <p className="mt-6 text-center text-[14px] text-muted">{tr("c.ownIdeas")}</p>
+        </section>
+      ) : pollParam && turns.length === 0 ? (
         <section className="flex-1 py-6">
           <VotePanel pollId={pollParam} />
           <p className="mt-6 text-center text-[14px] text-muted">{tr("c.ownIdeas")}</p>
