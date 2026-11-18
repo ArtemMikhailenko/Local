@@ -15,6 +15,7 @@ import { api } from "@/lib/client/api";
 import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 import type { Weather } from "@/lib/weather";
+import { categoryPhoto } from "@/lib/places/category-photos";
 
 
 const greetingKey = (h: number) => (h < 5 ? "greet.night" : h < 12 ? "greet.morning" : h < 18 ? "greet.afternoon" : "greet.evening");
@@ -217,7 +218,7 @@ export default function Discover() {
           <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4">
             {viewed.map((v) => (
               <Link key={v.id} href={`/place/${v.id}`} className="w-[116px] shrink-0">
-                <Photo src={v.photo} alt={v.name} className="aspect-square w-full rounded-2xl" />
+                <Photo src={v.photo} fallback={categoryPhoto(v.type, v.id)} alt={v.name} className="aspect-square w-full rounded-2xl" />
                 <div className="mt-2 truncate text-[14px] font-semibold">{v.name}</div>
                 <div className="truncate text-[12px] text-muted">{v.type}</div>
               </Link>
@@ -232,7 +233,7 @@ export default function Discover() {
           <div className="-mx-2 mt-2">{list === null ? [0, 1, 2].map((i) => <RowSkeleton key={i} />) : list.slice(6, 14).map((p) => <PlaceRow key={p.id} place={p} center={center} />)}</div>
         </section>
       )}
-      <p className="py-10 text-center text-[12px] text-muted">{t("footer.data")}</p>
+      <p className="py-10 text-center text-[12px] text-muted">{mode === "google" ? t("footer.dataGoogle") : t("footer.data")}</p>
       <LocationSheet open={locOpen} onClose={() => setLocOpen(false)} />
       <MapExplorer open={mapOpen} onClose={() => setMapOpen(false)} initialCat={CATEGORIES.findIndex((c) => c.key === cat.key)} />
     </main>

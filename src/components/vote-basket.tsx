@@ -6,7 +6,7 @@ import clsx from "clsx";
 import type { Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
 import { IconShare } from "./icons";
-import { Photo } from "./place-bits";
+import { Photo, fallbackFor } from "./place-bits";
 import { createPoll, sharePoll } from "./vote-panel";
 
 /** "Add to group vote" toggle, usable on any place. */
@@ -57,7 +57,7 @@ export function VoteBasketBar() {
       <div className="card flex items-center gap-3 !rounded-full p-1.5 pl-2">
         <div className="flex -space-x-3">
           {basket.map((p: Place) => (
-            <Photo key={p.id} src={p.photos[0]} alt={p.name} className="h-9 w-9 rounded-full ring-2 ring-white" />
+            <Photo key={p.id} src={p.photos[0]} fallback={fallbackFor(p)} alt={p.name} className="h-9 w-9 rounded-full ring-2 ring-white" />
           ))}
         </div>
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{t("vote.bar", { n: basket.length })}</span>

@@ -54,9 +54,12 @@ function withSitePhotos(inner: PlacesProvider): PlacesProvider {
   const pending = new Map<string, Promise<string | null>>();
   let active = 0;
 
+  // The venue's own photo goes first: it is free, while each Google photo costs quota.
   const apply = (p: Place): Place => {
     const url = known.get(p.id);
-    return url ? { ...p, photos: [url, ...p.photos.slice(1)], photosIllustrative: false } : p;
+    if (!url) return p;
+    const rest = p.photosIllustrative ? p.photos.slice(1) : p.photos.filter((x) => x !== url);
+    return { ...p, photos: [url, ...rest].slice(0, 3), photosIllustrative: false };
   };
   const lookupOne = (p: Place): Promise<string | null> => {
     if (known.has(p.id)) return Promise.resolve(known.get(p.id)!);
@@ -119,7 +122,7 @@ function build(): PlacesProvider {
   if (mode === "demo") return createDemoProvider();
   const osm = buildOsm();
   // Google first (ratings, real photos); if it fails or its daily quota is used up, fall back to OpenStreetMap.
-  if (mode === "google") return withFallback(cached(createGoogleProvider(env.googlePlacesKey)), osm);
+  if (mode === "google") return withFallback(withSitePhotos(cached(createGoogleProvider(env.googlePlacesKey))), osm);
   return osm;
 }
 

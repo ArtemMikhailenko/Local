@@ -9,6 +9,7 @@ import { MapView } from "@/components/map-view";
 import { BasketButton } from "@/components/vote-basket";
 import { Photo, PlaceRow, SaveButton } from "@/components/place-bits";
 import { Mascot } from "@/components/mascot";
+import { categoryPhoto } from "@/lib/places/category-photos";
 import { api, type SavedRow } from "@/lib/client/api";
 import type { LatLng } from "@/lib/geo";
 import { walkingRouteUrl } from "@/lib/route";
@@ -80,7 +81,7 @@ function VotesTab() {
           <Link href={`/concierge?poll=${p.id}`} className="card flex items-center gap-3 p-3 transition active:scale-[0.99]">
             <div className="flex -space-x-4">
               {p.options.slice(0, 3).map((o, i) => (
-                <Photo key={i} src={o.photo ?? undefined} alt={o.name} className="h-12 w-12 rounded-full ring-2 ring-white" />
+                <Photo key={i} src={o.photo ?? undefined} fallback={categoryPhoto("restaurant", o.name)} alt={o.name} className="h-12 w-12 rounded-full ring-2 ring-white" />
               ))}
             </div>
             <div className="min-w-0 flex-1">
