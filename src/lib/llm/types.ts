@@ -12,7 +12,7 @@ export type ToolSpec = {
 export type ToolCall = { id: string; name: string; input: unknown };
 export type ToolResult = { id: string; name: string; content: string; isError?: boolean };
 
-export type Turn = { toolCalls: ToolCall[]; text: string; refused: boolean };
+export type Turn = { toolCalls: ToolCall[]; text: string; refused: boolean; model?: string };
 
 export interface LlmSession {
   /** Sends the conversation so far and returns what the model wants to do next. */

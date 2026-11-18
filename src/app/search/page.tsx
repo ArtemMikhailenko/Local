@@ -21,7 +21,7 @@ const readRecent = (): string[] => {
 function SearchInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const { center, ready, mode } = useApp();
+  const { center, ready, mode, t } = useApp();
   const [q, setQ] = useState(params.get("q") ?? "");
   const [open, setOpen] = useState(false);
   const [maxPrice, setMaxPrice] = useState<number | undefined>();
@@ -66,26 +66,26 @@ function SearchInner() {
   return (
     <main className="px-4 pt-[max(env(safe-area-inset-top),14px)]">
       <div className="sticky top-0 z-20 -mx-4 bg-bg px-4 pb-3 pt-2">
-        <h1 className="display text-[30px]">Search</h1>
+        <h1 className="display text-[30px]">{t("search.title")}</h1>
         <label className="mt-4 flex items-center gap-3 rounded-2xl border border-line bg-canvas px-4 py-3 focus-within:border-accent">
           <IconSearch className="h-5 w-5 shrink-0 text-muted" />
           <input
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ramen, rooftop, bakery"
+            placeholder={t("search.placeholder")}
             className="w-full bg-transparent text-[17px] outline-none placeholder:text-muted"
             enterKeyHint="search"
           />
           {q && (
             <button onClick={() => setQ("")} className="mono text-muted hover:text-text">
-              Clear
+              {t("search.clear")}
             </button>
           )}
         </label>
         <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto">
           <button className={chip(open)} onClick={() => setOpen(!open)}>
-            Open now
+            {t("search.open")}
           </button>
           {mode !== "osm" &&
             [1, 2, 3].map((n) => (
@@ -100,7 +100,7 @@ function SearchInner() {
         <div className="pt-4">
           {recent.length > 0 && (
             <section className="mb-8">
-              <SectionTitle>Recent</SectionTitle>
+              <SectionTitle>{t("search.recent")}</SectionTitle>
               <ul>
                 {recent.map((r) => (
                   <li key={r}>
@@ -113,12 +113,12 @@ function SearchInner() {
               </ul>
             </section>
           )}
-          <SectionTitle>Browse</SectionTitle>
+          <SectionTitle>{t("search.browse")}</SectionTitle>
           <div className="mt-3 grid grid-cols-2 gap-3">
             {CATEGORIES.map((c) => (
               <button key={c.key} onClick={() => setQ(c.query)} className="group rounded-2xl bg-canvas p-4 text-left transition hover:bg-accent-soft">
                 <span className="text-2xl">{c.emoji}</span>
-                <span className="display mt-6 block text-[18px] group-hover:text-accent">{c.label}</span>
+                <span className="display mt-6 block text-[18px] group-hover:text-accent">{t(`cat.${c.key}`)}</span>
               </button>
             ))}
           </div>
@@ -126,10 +126,10 @@ function SearchInner() {
       )}
 
       {loading && [0, 1, 2, 3].map((i) => <RowSkeleton key={i} />)}
-      {!loading && results?.length === 0 && <p className="pt-10 text-center text-muted">No places found. Try a broader word or remove filters.</p>}
+      {!loading && results?.length === 0 && <p className="pt-10 text-center text-muted">{t("search.none")}</p>}
       {!loading && results && results.length > 0 && (
         <>
-          <p className="pb-1 pt-3 text-[14px] text-muted">{results.length} places</p>
+          <p className="pb-1 pt-3 text-[14px] text-muted">{t("search.count", { n: results.length })}</p>
           {results.map((p, i) => (
             <PlaceRow key={p.id} place={p} center={center} index={i} />
           ))}

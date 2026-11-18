@@ -33,7 +33,7 @@ export async function sharePoll(id: string, title: string, toast: (m: string) =>
 
 /** Live vote: anyone with the link can vote (no account); results refresh every few seconds. */
 export function VotePanel({ pollId }: { pollId: string }) {
-  const { toast } = useApp();
+  const { toast, t } = useApp();
   const [poll, setPoll] = useState<PollState | null>(null);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
@@ -78,15 +78,15 @@ export function VotePanel({ pollId }: { pollId: string }) {
   if (error) return <div className="card p-5 text-center text-muted">{error}</div>;
   if (!poll) return <div className="skeleton h-[320px] !rounded-[20px]" />;
 
-  const max = Math.max(1, ...poll.tally.map((t) => t.votes));
+  const max = Math.max(1, ...poll.tally.map((x) => x.votes));
   return (
     <div className="card rise space-y-4 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[13px] font-semibold text-accent">Let&apos;s decide together</div>
+          <div className="text-[13px] font-semibold text-accent">{t("vote.kicker")}</div>
           <h2 className="display mt-1 text-[22px]">{poll.title}</h2>
           <p className="mt-1 text-[13px] text-muted">
-            {poll.total} {poll.total === 1 ? "vote" : "votes"} so far · updates live
+            {t("vote.count", { n: poll.total })}
           </p>
         </div>
         <button onClick={() => sharePoll(poll.id, poll.title, toast)} aria-label="Share vote link" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
@@ -98,13 +98,13 @@ export function VotePanel({ pollId }: { pollId: string }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         maxLength={30}
-        placeholder="Your name"
+        placeholder={t("vote.name")}
         className="w-full rounded-xl border border-line bg-canvas px-4 py-3 text-[16px] outline-none focus:border-accent"
       />
 
       <div className="space-y-2">
         {poll.places.map((p) => {
-          const t = poll.tally.find((x) => x.placeId === p.id)!;
+          const tl = poll.tally.find((x) => x.placeId === p.id)!;
           const mine = poll.myVote === p.id;
           const leading = poll.leader === p.id;
           return (
@@ -114,20 +114,20 @@ export function VotePanel({ pollId }: { pollId: string }) {
               onClick={() => vote(p.id)}
               className={clsx("relative w-full overflow-hidden rounded-2xl border p-2.5 text-left transition active:scale-[0.99]", mine ? "border-accent" : "border-line")}
             >
-              <span className="absolute inset-y-0 left-0 bg-accent-soft transition-all duration-500" style={{ width: `${(t.votes / max) * 100}%` }} />
+              <span className="absolute inset-y-0 left-0 bg-accent-soft transition-all duration-500" style={{ width: `${(tl.votes / max) * 100}%` }} />
               <span className="relative flex items-center gap-3">
                 <Photo src={p.photos[0]} alt={p.name} className="h-14 w-14 shrink-0 rounded-xl" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-semibold">{p.name}</span>
-                    {leading && <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-ink">Leading</span>}
+                    {leading && <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-ink">{t("vote.leading")}</span>}
                   </span>
                   <span className="block text-[13px] text-muted">{p.type}</span>
-                  {t.voters.length > 0 && <span className="mt-0.5 block truncate text-[12px] font-medium text-accent">{t.voters.join(", ")}</span>}
+                  {tl.voters.length > 0 && <span className="mt-0.5 block truncate text-[12px] font-medium text-accent">{tl.voters.join(", ")}</span>}
                 </span>
                 <span className="text-right">
-                  <span className="block text-[22px] font-bold leading-none">{t.votes}</span>
-                  {mine && <span className="text-[11px] text-accent">your vote</span>}
+                  <span className="block text-[22px] font-bold leading-none">{tl.votes}</span>
+                  {mine && <span className="text-[11px] text-accent">{t("vote.yours")}</span>}
                 </span>
               </span>
             </button>
@@ -135,10 +135,10 @@ export function VotePanel({ pollId }: { pollId: string }) {
         })}
       </div>
       <div className="flex items-center justify-between text-[13px] text-muted">
-        <span>Tap to vote, tap another to change.</span>
+        <span>{t("vote.help")}</span>
         {poll.leader && (
           <Link href={`/place/${poll.leader}`} className="font-semibold text-accent">
-            Open winner →
+            {t("vote.winner")}
           </Link>
         )}
       </div>

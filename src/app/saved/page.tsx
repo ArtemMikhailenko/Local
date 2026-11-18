@@ -13,7 +13,7 @@ import { walkingRouteUrl } from "@/lib/route";
 
 /** Saved place with a private note ("ask for the window table"), edited inline and saved on blur. */
 function SavedItem({ row, center, index }: { row: SavedRow; center: LatLng; index: number }) {
-  const { toast, refreshSaved } = useApp();
+  const { toast, refreshSaved, t } = useApp();
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState(row.note ?? "");
   async function save() {
@@ -39,12 +39,12 @@ function SavedItem({ row, center, index }: { row: SavedRow; center: LatLng; inde
             rows={2}
             onChange={(e) => setNote(e.target.value)}
             onBlur={save}
-            placeholder="Who recommended it, what to order…"
+            placeholder={t("saved.notePh")}
             className="w-full resize-none rounded-xl border border-accent bg-canvas px-3 py-2 text-[14px] outline-none"
           />
         ) : (
           <button onClick={() => setEditing(true)} className="text-left text-[14px] text-muted hover:text-text">
-            {row.note ? <span className="text-text/85">“{row.note}”</span> : <span className="text-[14px] font-medium text-accent">+ Add note</span>}
+            {row.note ? <span className="text-text/85">“{row.note}”</span> : <span className="text-[14px] font-medium text-accent">{t("saved.addNote")}</span>}
           </button>
         )}
       </div>
@@ -53,7 +53,7 @@ function SavedItem({ row, center, index }: { row: SavedRow; center: LatLng; inde
 }
 
 export default function SavedPage() {
-  const { user, ready, saved, center, openAuth, setUser } = useApp();
+  const { user, ready, saved, center, openAuth, setUser, t, lang, setLang } = useApp();
   const router = useRouter();
   if (!ready) return null;
 
@@ -61,10 +61,10 @@ export default function SavedPage() {
     return (
       <main className="px-4 pt-[max(env(safe-area-inset-top),14px)]">
         
-        <h1 className="display mt-10 text-[34px]">Your places</h1>
-        <p className="mt-4 max-w-[300px] text-[15px] leading-relaxed text-muted">A private list of spots you love, with notes. The concierge uses it to learn your taste.</p>
+        <h1 className="display mt-10 text-[34px]">{t("saved.your")}</h1>
+        <p className="mt-4 max-w-[300px] text-[15px] leading-relaxed text-muted">{t("saved.lead")}</p>
         <button onClick={openAuth} className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink">
-          Sign in or create account
+          {t("saved.signin")}
           <IconArrow />
         </button>
       </main>
@@ -84,20 +84,23 @@ export default function SavedPage() {
         <span className="truncate text-text">
           {user.name} <span className="text-muted">· {user.email}</span>
         </span>
+        <button onClick={() => setLang(lang === "uk" ? "en" : "uk")} className="shrink-0 rounded-full bg-canvas px-3 py-1 font-semibold">
+          {lang === "uk" ? "EN" : "УКР"}
+        </button>
         <button onClick={logout} className="shrink-0 text-muted hover:text-text">
-          Sign out
+          {t("saved.signout")}
         </button>
       </header>
 
       <h1 className="display mt-7 text-[34px]">
-        Saved <span className="text-muted">{saved.length}</span>
+        {t("saved.title")} <span className="text-muted">{saved.length}</span>
       </h1>
 
       {saved.length === 0 ? (
         <div className="mt-6 rounded-2xl bg-canvas p-6">
-          <p className="text-muted">Nothing saved yet. Tap the bookmark on any place, or let the concierge find some.</p>
+          <p className="text-muted">{t("saved.empty")}</p>
           <Link href="/concierge" className="mt-4 inline-block font-semibold text-accent">
-            Open concierge →
+            {t("saved.openConcierge")}
           </Link>
         </div>
       ) : (
@@ -107,7 +110,7 @@ export default function SavedPage() {
           </div>
           {route && (
             <a href={route} target="_blank" rel="noreferrer" className="mt-3 flex h-11 items-center justify-center gap-2 rounded-full bg-surface-2 text-[15px] font-semibold">
-              Walk through all of them
+              {t("saved.walk")}
               <IconArrow />
             </a>
           )}

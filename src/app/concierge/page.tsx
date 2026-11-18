@@ -12,20 +12,12 @@ import { VotePanel, createPoll, sharePoll } from "@/components/vote-panel";
 import { walkingRouteUrl } from "@/lib/route";
 import { IllustrativeTag, Meta, Photo, SaveButton } from "@/components/place-bits";
 import type { ConciergeEvent } from "@/lib/concierge/agent";
+import { placeCache } from "@/lib/client/api";
 
 type Step = { kind: "status" | "search" | "inspect"; text: string };
 type ResultEvent = Extract<ConciergeEvent, { t: "result" }>;
 type PlanEvent = Extract<ConciergeEvent, { t: "plan" }>;
 type Turn = { id: number; prompt: string; steps: Step[]; result?: ResultEvent; plan?: PlanEvent; error?: string; done: boolean; pollId?: string };
-
-const SUGGESTIONS = [
-  "Plan a 4-hour date night from now, ending with a nightcap",
-  "Romantic dinner for two, under $$$, walking distance",
-  "We're 4 friends, want craft beer and something to eat",
-  "Rainy afternoon with a 6-year-old",
-  "Quiet café to work for 3 hours with good wifi",
-  "Best spot to watch the sunset with a drink",
-];
 
 function stepFrom(e: ConciergeEvent): Step | null {
   if (e.t === "status") return { kind: "status", text: e.text.toLowerCase() };
@@ -36,7 +28,9 @@ function stepFrom(e: ConciergeEvent): Step | null {
 
 function ConciergeInner() {
   const params = useSearchParams();
-  const { center, toast } = useApp();
+  const { center, toast, t: tr, lang } = useApp();
+  const SUGGESTIONS = tr("c.suggestions").split("|");
+  const REFINE = tr("c.refine").split("|");
   const pollParam = params.get("poll");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -80,7 +74,7 @@ function ConciergeInner() {
       const res = await fetch("/api/concierge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text, lat: center.lat, lng: center.lng, previous }),
+        body: JSON.stringify({ prompt: text, lat: center.lat, lng: center.lng, previous, lang }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -101,12 +95,14 @@ function ConciergeInner() {
           const step = stepFrom(e);
           if (step) update(id, (t) => ({ ...t, steps: [...t.steps, step] }));
           if (e.t === "result" || e.t === "plan" || e.t === "error") finished = true;
+          if (e.t === "plan") e.stops.forEach((s) => placeCache.set(s.place.id, s.place));
+          if (e.t === "result") e.picks.forEach((p) => placeCache.set(p.place.id, p.place));
           if (e.t === "plan") update(id, (t) => ({ ...t, plan: e }));
           if (e.t === "result") update(id, (t) => ({ ...t, result: e }));
           if (e.t === "error") update(id, (t) => ({ ...t, error: e.message }));
         }
       }
-      if (!finished) update(id, (t) => ({ ...t, error: "The connection dropped before the concierge finished. Please try again." }));
+      if (!finished) update(id, (t) => ({ ...t, error: tr("c.dropped") }));
     } catch (err) {
       update(id, (t) => ({ ...t, error: err instanceof Error ? err.message : "Network error" }));
     } finally {
@@ -120,23 +116,23 @@ function ConciergeInner() {
       <header className="flex items-center gap-3">
         <Mascot className="h-12 w-12" mood={busy ? "thinking" : turns.some((t) => t.result || t.plan) ? "happy" : "idle"} />
         <div>
-          <div className="text-[16px] font-semibold leading-tight">Lumi · concierge</div>
-          <div className="text-[13px] text-muted">{busy ? "Looking around for you…" : "Knows the neighbourhood"}</div>
+          <div className="text-[16px] font-semibold leading-tight">{tr("c.name")}</div>
+          <div className="text-[13px] text-muted">{busy ? tr("c.busy") : tr("c.idle")}</div>
         </div>
       </header>
 
       {pollParam && turns.length === 0 ? (
         <section className="flex-1 py-6">
           <VotePanel pollId={pollParam} />
-          <p className="mt-6 text-center text-[14px] text-muted">Want ideas of your own? Ask below.</p>
+          <p className="mt-6 text-center text-[14px] text-muted">{tr("c.ownIdeas")}</p>
         </section>
       ) : turns.length === 0 ? (
         <section className="rise flex-1 pb-4 pt-8">
           <Mascot className="mb-4 h-24 w-24" />
           <h1 className="display text-[34px]">
-            Tell me what you&apos;re in the mood for
+            {tr("c.title")}
           </h1>
-          <p className="mt-4 max-w-[310px] text-[15px] leading-relaxed text-muted">Who you&apos;re with, budget, mood, how long. I check what&apos;s open and walkable, then pick three, or plan the whole evening.</p>
+          <p className="mt-4 max-w-[310px] text-[15px] leading-relaxed text-muted">{tr("c.lead")}</p>
           <div className="mt-7 space-y-2">
             {SUGGESTIONS.map((s, i) => (
               <button
@@ -168,7 +164,7 @@ function ConciergeInner() {
                   {!t.done && (
                     <li className="flex items-center gap-2 font-medium text-accent">
                       <Mascot className="h-7 w-7" mood="thinking" />
-                      <span className="dots">Lumi is looking around</span>
+                      <span className="dots">{tr("c.thinking")}</span>
                     </li>
                   )}
                 </ol>
@@ -207,7 +203,7 @@ function ConciergeInner() {
                         className="flex h-11 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-semibold text-accent-ink"
                       >
                         <IconRoute />
-                        Walk all
+                        {tr("c.walkAll")}
                       </a>
                       {!t.pollId ? (
                         <button
@@ -223,10 +219,10 @@ function ConciergeInner() {
                           className="flex h-11 items-center justify-center gap-2 rounded-full bg-surface-2 text-[15px] font-semibold"
                         >
                           <IconShare className="h-4 w-4" />
-                          Friends vote
+                          {tr("c.vote")}
                         </button>
                       ) : (
-                        <span className="flex h-11 items-center justify-center rounded-full bg-accent-soft text-[14px] font-medium text-accent">Vote is live ↓</span>
+                        <span className="flex h-11 items-center justify-center rounded-full bg-accent-soft text-[14px] font-medium text-accent">{tr("c.voteLive")}</span>
                       )}
                     </div>
                   )}
@@ -236,8 +232,8 @@ function ConciergeInner() {
 
               {t.done && (t.result || t.plan) && (
                 <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-                  {["Cheaper", "Quieter", "Closer", "More unusual", "Make it a plan"].map((r) => (
-                    <button key={r} disabled={busy} onClick={() => ask(r === "Make it a plan" ? "Turn this into a timed plan for the evening" : `${r} options`)} className="shrink-0 rounded-full border border-line px-3.5 py-2 text-[14px] hover:border-accent hover:text-accent disabled:opacity-40">
+                  {REFINE.map((r, ri) => (
+                    <button key={r} disabled={busy} onClick={() => ask(ri === REFINE.length - 1 ? (lang === "uk" ? "Зроби з цього план вечора по годинах" : "Turn this into a timed plan for the evening") : lang === "uk" ? `${r}, будь ласка` : `${r} options`)} className="shrink-0 rounded-full border border-line px-3.5 py-2 text-[14px] hover:border-accent hover:text-accent disabled:opacity-40">
                       {r}
                     </button>
                   ))}
@@ -268,7 +264,7 @@ function ConciergeInner() {
             }}
             rows={1}
             maxLength={500}
-            placeholder={turns.length ? "Refine, or ask something new" : "Dinner with my parents, they love fish"}
+            placeholder={turns.length ? tr("c.placeholderMore") : tr("c.placeholder")}
             className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted"
           />
           <VoiceButton disabled={busy} onText={setInput} onFinal={(t) => ask(t)} />

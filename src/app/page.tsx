@@ -14,14 +14,8 @@ import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 import type { Weather } from "@/lib/weather";
 
-const PROMPTS = ["Romantic dinner, not too pricey", "Rainy day with kids", "Laptop-friendly coffee", "Plan our evening, 4 people"];
 
-function greeting(h: number) {
-  if (h < 5) return "Good night";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
+const greetingKey = (h: number) => (h < 5 ? "greet.night" : h < 12 ? "greet.morning" : h < 18 ? "greet.afternoon" : "greet.evening");
 
 function useClock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -34,7 +28,8 @@ function useClock() {
 }
 
 export default function Discover() {
-  const { user, center, locationLabel, mode, ready } = useApp();
+  const { user, center, locationLabel, mode, ready, t, lang, setLang } = useApp();
+  const PROMPTS = t("home.prompts").split("|");
   const router = useRouter();
   const now = useClock();
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>(CATEGORIES[2]);
@@ -111,6 +106,9 @@ export default function Discover() {
           {mode === "demo" && <span className="text-muted">· demo</span>}
         </span>
         <div className="flex items-center gap-2">
+          <button onClick={() => setLang(lang === "uk" ? "en" : "uk")} aria-label="Language" className="rounded-full bg-canvas px-3 py-1.5 text-[14px] font-semibold">
+            {lang === "uk" ? "EN" : "УКР"}
+          </button>
           {weather && (
             <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-[14px] font-medium">
               <span>{weather.emoji}</span>
@@ -125,11 +123,11 @@ export default function Discover() {
 
       <section className="rise pt-7">
         <p className="text-[15px] text-muted">
-          {now ? greeting(now.getHours()) : "Hello"}
+          {now ? t(greetingKey(now.getHours())) : t("greet.hello")}
           {user ? `, ${user.name.split(" ")[0]}` : ""}
           {time ? ` · ${time}` : ""}
         </p>
-        <h1 className="display mt-1 text-[38px]">Where to {evening ? "tonight" : "today"}?</h1>
+        <h1 className="display mt-1 text-[38px]">{t(evening ? "home.title.tonight" : "home.title.today")}</h1>
       </section>
 
       {/* Concierge entry: a friendly search-like box */}
@@ -137,8 +135,8 @@ export default function Discover() {
         <Link href="/concierge" className="card flex items-center gap-3 p-4 transition active:scale-[0.99]">
           <Mascot className="h-14 w-14 shrink-0" />
           <span className="min-w-0">
-            <span className="block text-[16px] font-semibold">Ask Lumi, your concierge</span>
-            <span className="block truncate text-[14px] text-muted">“Dinner for two, quiet, not too far”</span>
+            <span className="block text-[16px] font-semibold">{t("home.ask")}</span>
+            <span className="block truncate text-[14px] text-muted">{t("home.askHint")}</span>
           </span>
         </Link>
         <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
@@ -152,7 +150,7 @@ export default function Discover() {
           <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="mt-3 flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 text-[14px] text-text">
             <span className="text-lg">{weather.emoji}</span>
             <span>
-              {weather.label}, {weather.tempC}°. {weather.isNice ? "Great evening for a terrace." : "Cozy indoor places nearby →"}
+              {weather.label}, {weather.tempC}°. {weather.isNice ? t("home.weather.nice") : t("home.weather.cozy")}
             </span>
           </Link>
         )}
@@ -166,7 +164,7 @@ export default function Discover() {
             className={clsx("shrink-0 rounded-full px-4 py-2 text-[14px] font-medium transition", c.key === cat.key ? "bg-text text-white" : "bg-canvas text-text hover:bg-surface-2")}
           >
             <span className="mr-1.5">{c.emoji}</span>
-            {c.label}
+            {t(`cat.${c.key}`)}
           </button>
         ))}
       </nav>
@@ -175,17 +173,17 @@ export default function Discover() {
         <SectionTitle
           action={
             <Link href={`/search?q=${encodeURIComponent(cat.query)}`} className="text-[14px] font-semibold text-accent">
-              See all
+              {t("home.seeAll")}
             </Link>
           }
         >
-          Top {cat.label.toLowerCase()} nearby
+          {t("home.top", { cat: t(`cat.${cat.key}`) })}
         </SectionTitle>
         <div className="no-scrollbar -mx-4 mt-3 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 px-4 pb-2">
           {list === null
             ? [0, 1].map((i) => <div key={i} className="skeleton aspect-[4/5] w-[250px] shrink-0 !rounded-[20px]" />)
             : list.slice(0, 6).map((p) => <PlaceCard key={p.id} place={p} center={center} />)}
-          {list?.length === 0 && <p className="py-10 text-muted">Nothing here yet. Try another category.</p>}
+          {list?.length === 0 && <p className="py-10 text-muted">{t("home.empty")}</p>}
         </div>
       </section>
 
@@ -194,11 +192,11 @@ export default function Discover() {
           action={
             <button onClick={surprise} disabled={rolling} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-accent disabled:opacity-50">
               <IconDice className={rolling ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-              Surprise me
+              {t("home.surprise")}
             </button>
           }
         >
-          On the map
+          {t("home.map")}
         </SectionTitle>
         <div className="card mt-3 overflow-hidden">
           <MapView places={mapPlaces ?? list?.slice(0, 16) ?? []} center={center} onAreaChange={loadArea} loading={mapLoading} className="h-[320px] w-full" />
@@ -207,7 +205,7 @@ export default function Discover() {
 
       {viewed.length > 0 && (
         <section className="mt-8">
-          <SectionTitle>Recently viewed</SectionTitle>
+          <SectionTitle>{t("home.recent")}</SectionTitle>
           <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4">
             {viewed.map((v) => (
               <Link key={v.id} href={`/place/${v.id}`} className="w-[116px] shrink-0">
@@ -222,11 +220,11 @@ export default function Discover() {
 
       {(list === null || (list?.length ?? 0) > 6) && (
         <section className="mt-8">
-          <SectionTitle>More around you</SectionTitle>
+          <SectionTitle>{t("home.more")}</SectionTitle>
           <div className="-mx-2 mt-2">{list === null ? [0, 1, 2].map((i) => <RowSkeleton key={i} />) : list.slice(6, 14).map((p) => <PlaceRow key={p.id} place={p} center={center} />)}</div>
         </section>
       )}
-      <p className="py-10 text-center text-[12px] text-muted">Venue data © OpenStreetMap contributors · Weather by Open-Meteo</p>
+      <p className="py-10 text-center text-[12px] text-muted">{t("footer.data")}</p>
     </main>
   );
 }

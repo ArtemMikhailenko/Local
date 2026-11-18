@@ -7,7 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { IconArrow, IconBack, IconShare } from "@/components/icons";
 import { MapView } from "@/components/map-view";
 import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel } from "@/components/place-bits";
-import { api, ApiError } from "@/lib/client/api";
+import { api, ApiError, placeCache } from "@/lib/client/api";
 import { rememberViewed, sharePlace } from "@/lib/client/extras";
 import type { Place } from "@/lib/places/types";
 
@@ -23,8 +23,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function PlacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { center, toast } = useApp();
-  const [place, setPlace] = useState<Place | null>(null);
+  const { center, toast, t } = useApp();
+  const [place, setPlace] = useState<Place | null>(() => placeCache.get(id) ?? null);
   const [error, setError] = useState("");
   const [slide, setSlide] = useState(0);
 
@@ -37,7 +37,7 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
         setPlace(r.place);
         rememberViewed(r.place);
       })
-      .catch((e) => alive && setError(e instanceof ApiError && e.status === 404 ? "This place no longer exists." : "Could not load this place."));
+      .catch((e) => alive && !placeCache.has(id) && setError(e instanceof ApiError && e.status === 404 ? t("place.gone") : t("place.error")));
     return () => {
       alive = false;
     };
@@ -51,7 +51,7 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
         <div>
           <p className="text-muted">{error}</p>
           <Link href="/" className="mt-4 inline-block font-semibold text-accent">
-            Back to discover
+            {t("place.back")}
           </Link>
         </div>
       </main>
@@ -88,7 +88,7 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
             <button
               aria-label="Share"
               onClick={async () => {
-                if ((await sharePlace(place)) === "copied") toast("Link copied");
+                if ((await sharePlace(place)) === "copied") toast(t("toast.copied"));
               }}
               className="grid h-9 w-9 place-items-center rounded-full bg-white/95 text-text shadow-sm"
             >
@@ -124,7 +124,7 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
         <div className="mt-6 grid grid-cols-[1fr_auto] gap-2">
           {place.mapsUrl && (
             <a href={place.mapsUrl} target="_blank" rel="noreferrer" className="flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink">
-              Directions
+              {t("place.directions")}
               <IconArrow />
             </a>
           )}
@@ -132,14 +132,14 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
             href={`/concierge?q=${encodeURIComponent(`Something like ${place.name}, but different`)}`}
             className="flex h-12 items-center rounded-full bg-surface-2 px-5 text-[15px] font-semibold"
           >
-            Similar →
+            {t("place.similar")}
           </Link>
         </div>
 
         <dl className="mt-8 rounded-2xl bg-canvas px-4">
-          {place.address && <Row label="Address">{place.address}</Row>}
+          {place.address && <Row label={t("place.address")}>{place.address}</Row>}
           {place.hours.length > 0 && (
-            <Row label="Hours">
+            <Row label={t("place.hours")}>
               <ul className="space-y-0.5">
                 {place.hours.map((h) => {
                   const isToday = h.startsWith(today);
@@ -153,14 +153,14 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
             </Row>
           )}
           {host && (
-            <Row label="Website">
+            <Row label={t("place.website")}>
               <a href={place.website!} target="_blank" rel="noreferrer" className="border-b border-line-strong hover:border-text">
                 {host}
               </a>
             </Row>
           )}
           {place.phone && (
-            <Row label="Phone">
+            <Row label={t("place.phone")}>
               <a href={`tel:${place.phone}`} className="border-b border-line-strong hover:border-text">
                 {place.phone}
               </a>
@@ -174,7 +174,7 @@ export default function PlacePage({ params }: { params: Promise<{ id: string }> 
 
         {place.reviews.length > 0 && (
           <section className="mt-9">
-            <h2 className="display text-[22px]">What guests say</h2>
+            <h2 className="display text-[22px]">{t("place.reviews")}</h2>
             {place.reviews.map((r, i) => (
               <figure key={i} className="mt-3 rounded-2xl bg-canvas p-4">
                 <blockquote className="text-[15px] leading-relaxed text-text/90">“{r.text}”</blockquote>

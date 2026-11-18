@@ -6,7 +6,7 @@ import { api, ApiError } from "@/lib/client/api";
 import { useApp } from "./app-provider";
 
 export function AuthSheet() {
-  const { authOpen, closeAuth, setUser } = useApp();
+  const { authOpen, closeAuth, setUser, t } = useApp();
   const [tab, setTab] = useState<"login" | "signup">("signup");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -37,28 +37,28 @@ export function AuthSheet() {
         className="sheet-in w-full max-w-[480px] rounded-t-[28px] bg-surface px-5 pb-[max(env(safe-area-inset-bottom),20px)] pt-5"
       >
         <div className="flex justify-between text-[14px] text-muted">
-          <span>Account</span>
+          <span>{t("auth.account")}</span>
           <button type="button" onClick={closeAuth} className="hover:text-text">
-            Close ✕
+            {t("auth.close")}
           </button>
         </div>
-        <h2 className="display mt-4 text-[30px]">{tab === "signup" ? "Keep your places." : "Welcome back."}</h2>
-        <p className="mt-2 text-[14px] text-muted">Saved places and notes are private to your account. The concierge uses them to learn your taste.</p>
+        <h2 className="display mt-4 text-[30px]">{tab === "signup" ? t("auth.signupTitle") : t("auth.loginTitle")}</h2>
+        <p className="mt-2 text-[14px] text-muted">{t("auth.lead")}</p>
         <div className="mt-5 flex gap-5 border-b border-line">
-          {(["signup", "login"] as const).map((t) => (
-            <button type="button" key={t} onClick={() => setTab(t)} className={clsx("relative pb-2.5 text-[15px] font-medium", tab === t ? "text-text" : "text-muted")}>
-              {t === "signup" ? "Create account" : "Sign in"}
-              {tab === t && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
+          {(["signup", "login"] as const).map((k) => (
+            <button type="button" key={k} onClick={() => setTab(k)} className={clsx("relative pb-2.5 text-[15px] font-medium", tab === k ? "text-text" : "text-muted")}>
+              {k === "signup" ? t("auth.create") : t("auth.signin")}
+              {tab === k && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
             </button>
           ))}
         </div>
         <div className="mt-2">
-          {tab === "signup" && <input className={field} placeholder="Name" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
-          <input className={field} type="email" placeholder="Email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+          {tab === "signup" && <input className={field} placeholder={t("auth.name")} autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
+          <input className={field} type="email" placeholder={t("auth.email")} autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           <input
             className={field}
             type="password"
-            placeholder={tab === "signup" ? "Password, 8+ characters" : "Password"}
+            placeholder={tab === "signup" ? t("auth.passwordNew") : t("auth.password")}
             autoComplete={tab === "signup" ? "new-password" : "current-password"}
             minLength={tab === "signup" ? 8 : 1}
             value={form.password}
@@ -68,7 +68,7 @@ export function AuthSheet() {
         </div>
         {error && <p className="mt-3 text-[14px] text-danger">{error}</p>}
         <button disabled={busy} className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink disabled:opacity-60">
-          {busy ? "One moment" : tab === "signup" ? "Create account" : "Sign in"}
+          {busy ? t("auth.wait") : tab === "signup" ? t("auth.create") : t("auth.signin")}
           <span>→</span>
         </button>
       </form>

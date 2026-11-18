@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, ApiError, type SavedRow, type User } from "@/lib/client/api";
 import { DEFAULT_CENTER, distanceMeters, type LatLng } from "@/lib/geo";
+import { detectLang, translator, type Lang, type T } from "@/lib/i18n";
 
 type Ctx = {
   user: User | null;
@@ -19,6 +20,9 @@ type Ctx = {
   toggleSave: (placeId: string) => Promise<void>;
   refreshSaved: () => Promise<void>;
   toast: (msg: string) => void;
+  lang: Lang;
+  setLang: (l: Lang) => void;
+  t: T;
 };
 
 const AppContext = createContext<Ctx | null>(null);
@@ -33,7 +37,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<"google" | "osm" | "demo">("osm");
   const [center, setCenter] = useState<LatLng>(DEFAULT_CENTER);
-  const [locationLabel, setLocationLabel] = useState("Podil, Kyiv");
+  const [nearMe, setNearMe] = useState(false);
+  const [lang, setLangState] = useState<Lang>("en");
+  const t = useMemo(() => translator(lang), [lang]);
+  const locationLabel = nearMe ? (lang === "uk" ? "Поруч з тобою" : "Near you") : lang === "uk" ? "Поділ, Київ" : "Podil, Kyiv";
+
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem("locali:lang");
+    } catch {}
+    setLangState(detectLang(stored, navigator.language));
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+  const setLang = useCallback((l: Lang) => {
+    setLangState(l);
+    try {
+      localStorage.setItem("locali:lang", l);
+    } catch {}
+  }, []);
   const [saved, setSaved] = useState<SavedRow[]>([]);
   const [authOpen, setAuthOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -54,7 +78,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             (pos) => {
               const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
               setCenter(here);
-              setLocationLabel(distanceMeters(here, DEFAULT_CENTER) < 2000 ? "Podil, Kyiv" : "Near you");
+              setNearMe(distanceMeters(here, DEFAULT_CENTER) >= 2000);
             },
             () => {},
             { timeout: 6000, maximumAge: 300_000 },
@@ -86,7 +110,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           await api.unsave(placeId);
         } else {
           await api.save(placeId);
-          toast("Saved ♥");
+          toast(t("toast.saved"));
         }
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -96,7 +120,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       await refreshSaved();
     },
-    [user, savedIds, refreshSaved, toast],
+    [user, savedIds, refreshSaved, toast, t],
   );
 
   const value: Ctx = {
@@ -114,12 +138,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toggleSave,
     refreshSaved,
     toast,
+    lang,
+    setLang,
+    t,
   };
   return (
     <AppContext.Provider value={value}>
       {children}
       {toastMsg && (
-        <div role="status" className="fade-up pointer-events-none fixed inset-x-0 top-[max(env(safe-area-inset-top),16px)] z-[60] mx-auto w-fit rounded-full bg-text px-4 py-2 text-sm font-medium text-black shadow-xl">
+        <div role="status" className="rise pointer-events-none fixed inset-x-0 top-[max(env(safe-area-inset-top),16px)] z-[60] mx-auto w-fit rounded-full bg-text px-4 py-2 text-sm font-medium text-white shadow-xl">
           {toastMsg}
         </div>
       )}

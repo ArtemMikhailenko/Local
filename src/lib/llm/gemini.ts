@@ -1,6 +1,8 @@
 import { ApiError, ThinkingLevel, type Content, type GenerateContentResponse, type GoogleGenAI } from "@google/genai";
 import { LlmRateLimitError, type LlmFactory, type LlmSession, type ToolCall } from "./types";
 
+const PER_CALL_MS = 15_000;
+
 type GenerateFn = (req: Parameters<GoogleGenAI["models"]["generateContent"]>[0]) => Promise<GenerateContentResponse>;
 
 /**
@@ -16,8 +18,10 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
     return {
       async next() {
         let res: GenerateContentResponse | undefined;
+        let usedModel = models[0];
         for (let i = 0; i < models.length; i++) {
           try {
+            usedModel = models[i];
             res = await generate({
               model: models[i],
               contents: [...contents],
@@ -25,15 +29,19 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
                 systemInstruction: system,
                 tools: [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.parameters })) }],
                 temperature: 0.6,
-                abortSignal: signal,
+                // Per-call cap: a stuck model must not eat the whole run; on timeout we try the next model.
+                abortSignal: signal ? AbortSignal.any([signal, AbortSignal.timeout(PER_CALL_MS)]) : AbortSignal.timeout(PER_CALL_MS),
                 // Gemini 3+ thinks by default; for a snappy concierge keep it low.
                 ...(Number(models[i].match(/gemini-(\d+)/)?.[1] ?? 0) >= 3 ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
               },
             });
             break;
           } catch (err) {
-            const quota = err instanceof ApiError && (err.status === 429 || err.status === 503);
+            if (signal?.aborted) throw err; // the whole run was cancelled
+            const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+            const quota = timedOut || (err instanceof ApiError && (err.status === 429 || err.status === 500 || err.status === 503));
             if (!quota) throw err;
+            console.warn(`gemini ${models[i]} quota/unavailable, trying next`);
             if (i === models.length - 1) throw new LlmRateLimitError("All Gemini models are rate limited");
           }
         }
@@ -46,7 +54,7 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
           if (!id) syntheticIds.add((id = `local_${++callSeq}`));
           return { id, name: fc.name ?? "", input: fc.args ?? {} };
         });
-        return { toolCalls, text: res!.text ?? "", refused };
+        return { toolCalls, text: res!.text ?? "", refused, model: usedModel };
       },
       addToolResults(results) {
         contents.push({

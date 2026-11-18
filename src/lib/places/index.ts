@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { LatLng } from "@/lib/geo";
 import { env, placesMode } from "@/lib/env";
@@ -106,7 +106,8 @@ function withSitePhotos(inner: PlacesProvider): PlacesProvider {
       const p = await inner.details(id);
       if (!p?.website) return p;
       await loadKnown([p.id]);
-      await lookupOne(p).catch(() => null);
+      // Wait briefly for the website photo; if the site is slow, answer now and it lands next time.
+      await Promise.race([lookupOne(p).catch(() => null), new Promise((r) => setTimeout(r, 2500))]);
       return apply(p);
     },
   };
@@ -118,9 +119,20 @@ function build(): PlacesProvider {
   if (mode === "demo") return createDemoProvider();
   if (mode === "google") return cached(createGoogleProvider(env.googlePlacesKey));
   const overpass = overpassTransport();
+  // Find a venue in the Postgres area cache first: instant on cold serverless instances.
+  const one = async (id: string): Promise<OsmVenue | null> => {
+    try {
+      const rows = await db.execute(
+        sql`select v from ${schema.areaCache}, jsonb_array_elements(${schema.areaCache.venues}) v where v->>'id' = ${id} limit 1`,
+      );
+      const hit = (rows as unknown as Array<{ v: OsmVenue }>)[0]?.v;
+      if (hit) return hit;
+    } catch {}
+    return overpass.one(id);
+  };
   return withSitePhotos(createOsmProvider({
     area: withDbCache(env.geoapifyKey ? geoapifyTransport(env.geoapifyKey).area : overpass.area),
-    one: overpass.one,
+    one,
     timeZone: env.timeZone,
   }));
 }

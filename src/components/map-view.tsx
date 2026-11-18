@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import { distanceMeters, type LatLng } from "@/lib/geo";
 import type { Place } from "@/lib/places/types";
+import { useApp } from "./app-provider";
 
 // Free vector tiles, no key: https://openfreemap.org
 const STYLE = "https://tiles.openfreemap.org/styles/positron";
@@ -44,6 +45,7 @@ export function MapView({
   const userMoved = useRef(false);
   const lastReported = useRef<LatLng>(center);
   const router = useRouter();
+  const { t } = useApp();
   const [hint, setHint] = useState(false);
   // Refs so map callbacks always see the latest props, not the first render's.
   const latest = useRef({ places, activeId, onAreaChange });
@@ -136,7 +138,7 @@ export function MapView({
       <div ref={el} className={className} />
       {(loading || hint) && (
         <span className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-[12px] font-medium text-[#1c1b1a] shadow-md">
-          {loading ? "Loading this area…" : "Drag the map to explore"}
+          {loading ? t("map.loading") : t("map.hint")}
         </span>
       )}
     </div>

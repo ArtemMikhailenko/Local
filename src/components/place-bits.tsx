@@ -23,22 +23,24 @@ export function Rating({ place }: { place: Place }) {
 }
 
 export function OpenBadge({ open }: { open: boolean | null }) {
+  const { t } = useApp();
   if (open == null) return null;
   return (
     <span className={clsx("inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium", open ? "text-open" : "text-muted")}>
       <span className={clsx("h-2 w-2 rounded-full", open ? "bg-open" : "bg-line-strong")} />
-      {open ? "Open now" : "Closed"}
+      {open ? t("place.open") : t("place.closed")}
     </span>
   );
 }
 
 export function Walk({ from, to }: { from: LatLng; to: LatLng }) {
+  const { t } = useApp();
   const d = distanceMeters(from, to);
   const min = walkingMinutes(d);
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap text-[13px] text-muted">
       <IconWalk className="h-3.5 w-3.5" />
-      {min <= 30 ? `${min} min` : formatDistance(d)}
+      {min <= 30 ? t("place.min", { n: min }) : formatDistance(d)}
     </span>
   );
 }
@@ -55,11 +57,11 @@ export function Meta({ place, center, className, showType = true }: { place: Pla
 }
 
 export function SaveButton({ placeId, className }: { placeId: string; className?: string }) {
-  const { savedIds, toggleSave } = useApp();
+  const { savedIds, toggleSave, t } = useApp();
   const on = savedIds.has(placeId);
   return (
     <button
-      aria-label={on ? "Remove from saved" : "Save"}
+      aria-label={on ? t("place.unsave") : t("place.save")}
       aria-pressed={on}
       onClick={(e) => {
         e.preventDefault();
@@ -75,7 +77,8 @@ export function SaveButton({ placeId, className }: { placeId: string; className?
 }
 
 export function IllustrativeTag({ className }: { className?: string }) {
-  return <span className={clsx("rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm", className)}>Illustration</span>;
+  const { t } = useApp();
+  return <span className={clsx("rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm", className)}>{t("place.illustration")}</span>;
 }
 
 export function Photo({ src, alt, className }: { src?: string; alt: string; className?: string }) {

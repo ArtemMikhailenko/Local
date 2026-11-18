@@ -6,6 +6,13 @@ export class ApiError extends Error {
   }
 }
 
+/** Places already seen in lists, so a place page can render instantly while it refreshes. */
+export const placeCache = new Map<string, Place>();
+const remember = (list: Place[]) => {
+  for (const p of list) placeCache.set(p.id, p);
+  return list;
+};
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
   const data = await res.json().catch(() => ({}));
@@ -26,10 +33,10 @@ export const api = {
     const p = new URLSearchParams({ q, lat: String(lat), lng: String(lng) });
     if (opts.open) p.set("open", "1");
     if (opts.maxPrice) p.set("maxPrice", String(opts.maxPrice));
-    return request<{ results: Place[] }>(`/api/places/search?${p}`);
+    return request<{ results: Place[] }>(`/api/places/search?${p}`).then((r) => ({ results: remember(r.results) }));
   },
-  place: (id: string) => request<{ place: Place }>(`/api/places/${encodeURIComponent(id)}`),
-  saved: () => request<{ saved: SavedRow[] }>("/api/saved"),
+  place: (id: string) => request<{ place: Place }>(`/api/places/${encodeURIComponent(id)}`).then((r) => (placeCache.set(r.place.id, r.place), r)),
+  saved: () => request<{ saved: SavedRow[] }>("/api/saved").then((r) => (remember(r.saved.map((s) => s.place)), r)),
   save: (placeId: string) => request("/api/saved", { method: "POST", body: JSON.stringify({ placeId }) }),
   note: (placeId: string, note: string) => request("/api/saved", { method: "PATCH", body: JSON.stringify({ placeId, note }) }),
   unsave: (placeId: string) => request(`/api/saved?placeId=${encodeURIComponent(placeId)}`, { method: "DELETE" }),

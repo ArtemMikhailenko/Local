@@ -24,6 +24,7 @@ const Body = z.object({
     .array(z.object({ prompt: z.string().max(500), picked: z.array(z.string().max(120)).max(3) }))
     .max(4)
     .optional(),
+  lang: z.enum(["en", "uk"]).optional(),
 });
 
 
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
         }, DEADLINE_MS);
         try {
           const picks = await runConcierge(
-            { prompt: body.data.prompt, center, localTime, savedNames, previous: body.data.previous, weather: weather ? weatherHint(weather) : undefined },
+            { prompt: body.data.prompt, center, localTime, savedNames, previous: body.data.previous, lang: body.data.lang, weather: weather ? weatherHint(weather) : undefined },
             {
               llm: await provider.factory(),
               places,
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
         } catch (err) {
           if (abort.signal.aborted) return;
           console.error("concierge failed", err);
+          emit({ t: "debug", text: `error: ${err instanceof Error ? err.message.slice(0, 200) : "unknown"}` });
           const message = err instanceof LlmRateLimitError ? "The free AI quota is used up for now. Try again in a minute." : "Something went wrong. Please try again.";
           emit({ t: "error", message });
         } finally {

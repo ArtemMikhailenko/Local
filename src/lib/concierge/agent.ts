@@ -10,7 +10,9 @@ export type ConciergeEvent =
   | { t: "inspect"; name: string }
   | { t: "result"; intro: string; picks: Array<Picks["picks"][number] & { place: Place }> }
   | { t: "plan"; intro: string; stops: Array<Plan["stops"][number] & { place: Place; walk_min: number }> }
-  | { t: "error"; message: string };
+  | { t: "error"; message: string }
+  /** Timing/diagnostics; ignored by the UI, useful when watching the raw stream. */
+  | { t: "debug"; text: string };
 
 export type ConciergeInput = {
   prompt: string;
@@ -18,6 +20,7 @@ export type ConciergeInput = {
   localTime: string;
   savedNames: string[];
   weather?: string;
+  lang?: "en" | "uk";
   previous?: Array<{ prompt: string; picked: string[] }>;
 };
 
@@ -160,6 +163,7 @@ export function buildUserMessage(input: ConciergeInput): string {
   if (input.weather) lines.push(`Weather now: ${input.weather}`);
   if (input.savedNames.length) lines.push(`Places the guest has saved before (taste signal): ${input.savedNames.slice(0, 15).join(", ")}`);
   for (const prev of input.previous ?? []) lines.push(`Earlier request: "${prev.prompt}" → suggested ${prev.picked.join(", ")}`);
+  if (input.lang === "uk") lines.push("Interface language: Ukrainian. Write intro, headlines, reasons and tips in Ukrainian.");
   lines.push("", `Guest request: ${input.prompt}`);
   return lines.join("\n");
 }
@@ -174,7 +178,9 @@ export async function runConcierge(input: ConciergeInput, deps: ConciergeDeps): 
 
   for (let turn = 0; turn < maxTurns; turn++) {
     if (signal?.aborted) return null;
-    const { toolCalls, refused } = await session.next();
+    const started = Date.now();
+    const { toolCalls, refused, text, model } = await session.next();
+    emit({ t: "debug", text: `turn ${turn + 1}: ${((Date.now() - started) / 1000).toFixed(1)}s, ${toolCalls.length} tool call(s)${model ? ` via ${model}` : ""}${toolCalls.length ? "" : `, text: ${text.slice(0, 80)}`}` });
     if (refused) {
       emit({ t: "error", message: "The concierge could not help with that request." });
       return null;
