@@ -97,7 +97,7 @@ export function Photo({ src, alt, className, fallback }: { src?: string; alt: st
 }
 
 export const streetPhoto = (p: Place) => `/api/street-photo?lat=${p.location.lat.toFixed(6)}&lng=${p.location.lng.toFixed(6)}`;
-/** Real street-level photo near the venue first (Mapillary), then a category photo. */
+/** When the venue photo fails (e.g. Google photo quota is used up): Street View of the entrance, then a category photo. The venue photo stays first, so it comes back as soon as quota does. */
 export const fallbackFor = (p: Place) => [streetPhoto(p), categoryPhoto(p.type, p.id)];
 /** For venues whose own photo is just an illustration, try the real street photo first. */
 export const coverOf = (p: Place) => (p.photosIllustrative ? streetPhoto(p) : p.photos[0]);

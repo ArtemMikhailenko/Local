@@ -69,7 +69,7 @@ export function PlaceClient({ id }: { id: string }) {
       </main>
     );
 
-  // Venues without their own photo: real street-level photo first (Mapillary), then the illustration.
+  // Venues without their own photo: Street View of the entrance first, then the illustration.
   const photos = place.photosIllustrative ? [streetPhoto(place), ...place.photos] : place.photos.length ? place.photos : [undefined];
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const host = place.website ? new URL(place.website).hostname.replace(/^www\./, "") : null;

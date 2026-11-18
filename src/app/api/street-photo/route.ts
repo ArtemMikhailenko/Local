@@ -1,63 +1,84 @@
-import { distanceMeters, parseLatLng } from "@/lib/geo";
+import { and, eq, sql } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+import { env } from "@/lib/env";
+import { parseLatLng } from "@/lib/geo";
 import { clientIp } from "@/lib/http";
 import { createRateLimiter } from "@/lib/ratelimit";
+import { NONE_RETRY_MS, PANO_ID_RE, bearing, viewKey } from "@/lib/street-view";
+
+export const runtime = "nodejs";
 
 const limiter = createRateLimiter(120, 60_000);
-const notFound = (reason: string) => new Response("Not found", { status: 404, headers: { "Cache-Control": "public, max-age=600", "X-Reason": reason } });
+/** Static Street View: 10,000 free images a month. Stay well under it per day. */
+const DAILY_LIMIT = Number(process.env.STREETVIEW_DAILY_LIMIT) || 300;
 
-type MlyImage = { id: string; thumb_1024_url?: string; thumb_original_url?: string; computed_geometry?: { coordinates: [number, number] }; geometry?: { coordinates: [number, number] }; is_pano?: boolean };
+const notFound = (reason: string, maxAge = 600) =>
+  new Response("Not found", { status: 404, headers: { "Cache-Control": `public, max-age=${maxAge}`, "X-Reason": reason } });
+
+/** Find the outdoor panorama closest to the venue (free metadata call) and remember it. */
+async function lookup(at: { lat: number; lng: number }) {
+  const key = viewKey(at);
+  const [row] = await db.select().from(schema.streetViews).where(eq(schema.streetViews.key, key)).limit(1);
+  if (row && (row.status === "ok" || Date.now() - row.checkedAt.getTime() < NONE_RETRY_MS)) return row;
+
+  const res = await fetch(
+    `https://maps.googleapis.com/maps/api/streetview/metadata?location=${at.lat},${at.lng}&radius=60&source=outdoor&key=${env.googlePlacesKey}`,
+    { cache: "no-store", signal: AbortSignal.timeout(6000) },
+  );
+  const meta = (await res.json().catch(() => ({}))) as { status?: string; pano_id?: string; location?: { lat: number; lng: number } };
+  // Anything other than OK / ZERO_RESULTS (e.g. the API is not enabled) is not remembered.
+  if (meta.status !== "OK" && meta.status !== "ZERO_RESULTS") throw new Error(`meta-${meta.status ?? res.status}`);
+  const ok = meta.status === "OK" && meta.pano_id && PANO_ID_RE.test(meta.pano_id) && meta.location;
+  const value = {
+    key,
+    panoId: ok ? meta.pano_id! : null,
+    heading: ok ? bearing(meta.location!, at) : null, // turn the camera from the car towards the venue
+    status: (ok ? "ok" : "none") as "ok" | "none",
+    checkedAt: new Date(),
+  };
+  await db.insert(schema.streetViews).values(value).onConflictDoUpdate({ target: schema.streetViews.key, set: value });
+  return value;
+}
+
+/** Atomically count one paid image for today; false once the daily cap is reached. */
+async function takeQuota() {
+  const day = new Date().toISOString().slice(0, 10);
+  const [row] = await db
+    .insert(schema.apiUsage)
+    .values({ day, api: "streetview", count: 1 })
+    .onConflictDoUpdate({ target: [schema.apiUsage.day, schema.apiUsage.api], set: { count: sql`${schema.apiUsage.count} + 1` } })
+    .returning({ count: schema.apiUsage.count });
+  if (row.count <= DAILY_LIMIT) return true;
+  await db.update(schema.apiUsage).set({ count: sql`${schema.apiUsage.count} - 1` }).where(and(eq(schema.apiUsage.day, day), eq(schema.apiUsage.api, "streetview")));
+  return false;
+}
 
 /**
- * Street-level photo near a venue from Mapillary (free, open imagery). We look ~45 m around the
- * point, prefer the closest non-panorama shot, and redirect to its thumbnail. Mapillary thumbnail
- * URLs are signed and expire, so the lookup is cached briefly rather than the URL stored forever.
+ * Street-level photo of a venue from Google Street View, used only when the venue has no photo
+ * of its own. The image is fetched server-side (the key never reaches the browser) and the CDN
+ * keeps it for a week, so each venue costs at most one paid request per week.
  */
 export async function GET(req: Request) {
-  const token = process.env.MAPILLARY_TOKEN;
-  if (!token) return notFound("no-token");
-  if (!limiter.check(`sp:${clientIp(req)}`).ok) return notFound("rate-limit");
+  if (!env.googlePlacesKey) return notFound("no-key");
+  if (!limiter.check(`sp:${clientIp(req)}`).ok) return notFound("rate-limit", 60);
   const url = new URL(req.url);
   const at = parseLatLng(url.searchParams.get("lat"), url.searchParams.get("lng"));
   if (!at) return notFound("bad-coords");
 
-  const d = 0.0011; // ~120 m: central Kyiv coverage is sparse
-  const bbox = [at.lng - d, at.lat - d, at.lng + d, at.lat + d].map((n) => n.toFixed(6)).join(",");
   try {
-    const res = await fetch(
-      `https://graph.mapillary.com/images?access_token=${encodeURIComponent(token)}&fields=id,computed_geometry,geometry,is_pano&bbox=${bbox}&limit=20`,
-      { next: { revalidate: 3_600 }, signal: AbortSignal.timeout(8000) },
+    const view = await lookup(at);
+    if (view.status !== "ok" || !view.panoId) return notFound("no-pano", 86_400);
+    if (!(await takeQuota())) return notFound("daily-limit", 600);
+    const img = await fetch(
+      `https://maps.googleapis.com/maps/api/streetview?size=640x480&pano=${view.panoId}&heading=${view.heading ?? 0}&fov=80&pitch=5&return_error_code=true&key=${env.googlePlacesKey}`,
+      { cache: "no-store", signal: AbortSignal.timeout(8000) },
     );
-    if (!res.ok) return notFound(`mapillary-${res.status}`);
-    const { data } = (await res.json()) as { data?: MlyImage[] };
-    // The bbox search returns positions only; thumbnails come from a per-image lookup.
-    const ranked = (data ?? [])
-      .map((i) => ({ i, geo: (i.computed_geometry ?? i.geometry)?.coordinates }))
-      .filter((x) => x.geo)
-      .map((x) => ({ ...x, dist: distanceMeters(at, { lng: x.geo![0], lat: x.geo![1] }) + (x.i.is_pano ? 30 : 0) }))
-      .sort((a, b) => a.dist - b.dist)
-      .slice(0, 3);
-    if (!ranked.length) return notFound(`no-images-${(data ?? []).length}`);
-    let thumb: string | undefined;
-    let why = "";
-    for (const cand of ranked) {
-      // Mapillary documents both styles; image fields are sometimes only returned with the OAuth header.
-      const one = await fetch(`https://graph.mapillary.com/${cand.i.id}?fields=id,thumb_1024_url,thumb_2048_url,thumb_256_url,thumb_original_url`, {
-        headers: { Authorization: `OAuth ${token}` },
-        next: { revalidate: 1_800 },
-        signal: AbortSignal.timeout(8000),
-      });
-      const body = (await one.json().catch(() => ({}))) as Record<string, unknown>;
-      thumb = [body.thumb_1024_url, body.thumb_2048_url, body.thumb_original_url, body.thumb_256_url].find((u): u is string => typeof u === "string" && u.startsWith("https://"));
-      if (thumb) break;
-      // Diagnostics: what Mapillary sent instead of a thumbnail (keys and error message only, no URLs).
-      const err = (body.error as { message?: string; code?: number } | undefined) ?? undefined;
-      why = `${one.status}:${Object.keys(body).join("+")}${err ? `:${err.code ?? ""}:${(err.message ?? "").slice(0, 80)}` : ""}`;
-    }
-    if (!thumb) return notFound(`no-thumb-${why}`.replace(/[^\x20-\x7e]/g, ""));
-    return new Response(null, { status: 302, headers: { Location: thumb, "Cache-Control": "public, max-age=1800" } });
+    const type = img.headers.get("content-type") ?? "";
+    if (!img.ok || !type.startsWith("image/")) return notFound(`image-${img.status}`);
+    return new Response(await img.arrayBuffer(), {
+      headers: { "Content-Type": type, "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400" },
+    });
   } catch (e) {
-    return notFound(`error-${e instanceof Error ? e.name : "unknown"}`);
+    return notFound(`error-${e instanceof Error ? e.message.replace(/[^\w-]/g, "").slice(0, 40) : "unknown"}`, 300);
   }
 }
-
-export const runtime = "nodejs";

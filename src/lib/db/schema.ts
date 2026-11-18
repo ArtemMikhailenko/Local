@@ -1,4 +1,4 @@
-import { jsonb, pgTable, primaryKey, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
 import type { Place } from "@/lib/places/types";
 
 export const users = pgTable("users", {
@@ -127,4 +127,28 @@ export const conciergeRuns = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("concierge_runs_user_idx").on(t.userId)],
+);
+
+/**
+ * Which Google Street View panorama looks at a venue, found once with the free metadata call.
+ * Only the pano id and camera heading are kept (allowed by Google's terms), never the image.
+ * status "none" means no outdoor panorama nearby; it is re-checked after 30 days.
+ */
+export const streetViews = pgTable("street_views", {
+  key: text("key").primaryKey(), // "lat,lng" rounded to 5 decimals (~1 m)
+  panoId: text("pano_id"),
+  heading: integer("heading"),
+  status: text("status").$type<"ok" | "none">().notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Daily counters for paid APIs, so a free quota can never turn into a bill. */
+export const apiUsage = pgTable(
+  "api_usage",
+  {
+    day: text("day").notNull(), // YYYY-MM-DD (UTC)
+    api: text("api").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.api] })],
 );
