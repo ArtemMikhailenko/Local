@@ -33,6 +33,8 @@ export type ConciergeDeps = {
   /** Minutes since local midnight now, and an hours check for plan validation (null = unknown hours). */
   nowMinutes?: number;
   openAt?: (place: Place, minutesOfDay: number, dayOffset: number) => boolean | null;
+  /** Resolves a named area to coordinates (for "dinner in Podil" while the guest is elsewhere). */
+  geocode?: (near: string) => Promise<LatLng | null>;
 };
 
 const MAX_TOOL_USES_PER_TURN = 4;
@@ -42,6 +44,7 @@ A guest describes what they want; you find 1–3 real places that fit and explai
 
 How to work:
 - Always ground recommendations in tool results. Use search_places (you can call it several times in parallel with different angles, e.g. "wine bar" and "rooftop bar"), and get_place_details when hours, reviews or vibe matter.
+- If the guest names a district, landmark or city, pass it as near to search_places; walking times are then counted from there.
 - Respect hard constraints from the guest: party size, kids, budget, open now, walking distance, diet. If none fit perfectly, pick the closest options and say what is off.
 - Prefer variety (not three of the same kind) unless the guest asked for one kind.
 - Reasons must be concrete: mention rating, walking time, price, a dish or detail from the summary/reviews. No generic praise.
@@ -62,6 +65,7 @@ export const TOOLS: ToolSpec[] = [
         open_now: { type: "boolean", description: "Only places open right now." },
         max_price: { type: "integer", minimum: 1, maximum: 4, description: "Upper price level, 1 = cheap, 4 = very expensive." },
         radius_m: { type: "integer", minimum: 200, maximum: 20000, description: "Search radius in meters, default 2500." },
+        near: { type: "string", description: "A district, landmark or city the guest named (e.g. 'Podil, Kyiv', 'Золоті ворота'). Omit to search around the guest." },
       },
       required: ["query"],
       additionalProperties: false,
@@ -137,6 +141,7 @@ const SearchInput = z.object({
   open_now: z.boolean().optional(),
   max_price: z.number().int().min(1).max(4).optional(),
   radius_m: z.number().int().min(200).max(20000).optional(),
+  near: z.string().min(2).max(120).optional(),
 });
 const DetailsInput = z.object({ place_id: z.string().min(1).max(200) });
 
@@ -242,22 +247,24 @@ async function executeTool(
   places: PlacesProvider,
   seen: Map<string, Place>,
   emit: (e: ConciergeEvent) => void,
-  deps: Pick<ConciergeDeps, "nowMinutes" | "openAt"> = {},
+  deps: Pick<ConciergeDeps, "nowMinutes" | "openAt" | "geocode"> = {},
 ): Promise<{ content: string; isError?: boolean; final?: Picks; plan?: Plan }> {
   try {
     if (tool.name === "search_places") {
       const args = SearchInput.parse(tool.input);
+      const area = args.near && deps.geocode ? await deps.geocode(args.near) : null;
+      if (args.near && !area) return { content: `Could not find "${args.near}". Try a better-known name, or omit near.`, isError: true };
       const found = await places.search({
         query: args.query,
-        center,
+        center: area ?? center,
         openNow: args.open_now,
         maxPrice: args.max_price,
         radiusM: args.radius_m ?? 2500,
         limit: 8,
       });
       found.forEach((p) => seen.set(p.id, p));
-      emit({ t: "search", query: args.query, count: found.length });
-      return { content: JSON.stringify(found.map((p) => compactPlace(p, center))) };
+      emit({ t: "search", query: args.near ? `${args.query} · ${args.near}` : args.query, count: found.length });
+      return { content: JSON.stringify(found.map((p) => compactPlace(p, area ?? center))) };
     }
     if (tool.name === "get_place_details") {
       const { place_id } = DetailsInput.parse(tool.input);

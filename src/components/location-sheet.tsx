@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import type { GeoHit } from "@/lib/geocode";
 import { useApp } from "./app-provider";
 import { IconPin } from "./icons";
 
@@ -17,7 +19,23 @@ const SPOTS = [
 ];
 
 export function LocationSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { setLocation, locateMe, locationLabel, lang, t } = useApp();
+  const { setLocation, locateMe, locationLabel, lang, t, center } = useApp();
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<GeoHit[]>([]);
+  useEffect(() => {
+    if (q.trim().length < 3) return setHits([]);
+    let alive = true;
+    const timer = setTimeout(() => {
+      fetch(`/api/geocode?q=${encodeURIComponent(q)}&lat=${center.lat}&lng=${center.lng}&lang=${lang}`)
+        .then((r) => r.json())
+        .then((d) => alive && setHits(d.results ?? []))
+        .catch(() => {});
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [q, lang, center.lat, center.lng]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
@@ -35,8 +53,29 @@ export function LocationSheet({ open, onClose }: { open: boolean; onClose: () =>
           <IconPin className="h-5 w-5" />
           {t("loc.mine")}
         </button>
-        <ul className="mt-3 max-h-[46vh] overflow-y-auto">
-          {SPOTS.map((s) => {
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={t("loc.search")}
+          className="mt-3 w-full rounded-xl border border-line bg-canvas px-4 py-3 text-[16px] outline-none focus:border-accent"
+        />
+        <ul className="mt-2 max-h-[46vh] overflow-y-auto">
+          {hits.map((h) => (
+            <li key={`${h.location.lat},${h.location.lng}`}>
+              <button
+                onClick={() => {
+                  setLocation(h.location, h.label);
+                  setQ("");
+                  onClose();
+                }}
+                className="flex w-full items-center gap-2 border-b border-line py-3.5 text-left text-[16px]"
+              >
+                <IconPin className="h-4 w-4 shrink-0 text-accent" />
+                {h.label}
+              </button>
+            </li>
+          ))}
+          {hits.length === 0 && SPOTS.map((s) => {
             const label = lang === "uk" ? s.uk : s.en;
             const active = label === locationLabel;
             return (

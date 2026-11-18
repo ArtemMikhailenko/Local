@@ -11,10 +11,11 @@ export async function GET(req: Request) {
   if (!PHOTO_REF_RE.test(ref) || !env.googlePlacesKey) return new Response("Not found", { status: 404 });
   const res = await fetch(
     `https://places.googleapis.com/v1/${ref}/media?maxWidthPx=1200&skipHttpRedirect=true`,
-    { headers: { "X-Goog-Api-Key": env.googlePlacesKey }, next: { revalidate: 3_600 } },
+    // Shared Vercel data cache: one quota hit per photo per day.
+    { headers: { "X-Goog-Api-Key": env.googlePlacesKey }, next: { revalidate: 86_400 } },
   );
   if (!res.ok) return new Response("Not found", { status: 404 });
   const { photoUri } = (await res.json()) as { photoUri?: string };
   if (!photoUri?.startsWith("https://")) return new Response("Not found", { status: 404 });
-  return new Response(null, { status: 302, headers: { Location: photoUri, "Cache-Control": "public, max-age=3600" } });
+  return new Response(null, { status: 302, headers: { Location: photoUri, "Cache-Control": "public, max-age=86400" } });
 }

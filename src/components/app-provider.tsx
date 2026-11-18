@@ -108,7 +108,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(r.user);
         setMode(r.mode);
         // Demo data lives in Kyiv; with real data we use the guest's actual location.
-        if (r.mode !== "demo") locate(false);
+        // A place the guest picked by hand wins over GPS (e.g. living outside the city, planning a night in the centre).
+        let manual: { c: LatLng; label: string } | null = null;
+        try {
+          manual = JSON.parse(localStorage.getItem("locali:location") ?? "null");
+        } catch {}
+        if (manual?.c && typeof manual.c.lat === "number") {
+          setCenter(manual.c);
+          setCustomLabel(manual.label);
+        } else if (r.mode !== "demo") locate(false);
       })
       .catch(() => {})
       .finally(() => setReady(true));
@@ -174,8 +182,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setLocation: (c: LatLng, label: string) => {
       setCenter(c);
       setCustomLabel(label);
+      try {
+        localStorage.setItem("locali:location", JSON.stringify({ c, label }));
+      } catch {}
     },
-    locateMe: () => locate(true),
+    locateMe: () => {
+      try {
+        localStorage.removeItem("locali:location");
+      } catch {}
+      locate(true);
+    },
     lang,
     setLang,
     t,

@@ -65,7 +65,7 @@ export function normalizeGooglePlace(p: any): Place {
     photos: (p.photos ?? [])
       .map((ph: any) => ph?.name)
       .filter((n: unknown): n is string => typeof n === "string" && PHOTO_REF_RE.test(n))
-      .slice(0, 6)
+      .slice(0, 3) // each photo costs a Places API request: keep it to three
       .map(photoUrl),
     summary: p.editorialSummary?.text ?? null,
     website: httpUrl(p.websiteUri),

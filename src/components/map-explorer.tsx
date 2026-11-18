@@ -9,7 +9,7 @@ import { CATEGORIES, type Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
 import { IconBack } from "./icons";
 import { MapView } from "./map-view";
-import { Meta, Photo, SaveButton } from "./place-bits";
+import { Meta, Photo, SaveButton, fallbackFor } from "./place-bits";
 import { BasketButton } from "./vote-basket";
 
 /**
@@ -89,7 +89,7 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
             className={clsx("card w-[86%] shrink-0 snap-center p-3 transition", p.id === active ? "ring-2 ring-accent" : "opacity-95")}
           >
             <div className="flex gap-3">
-              <Photo src={p.photos[0]} alt={p.name} className="h-20 w-20 shrink-0 rounded-xl" />
+              <Photo src={p.photos[0]} fallback={fallbackFor(p)} alt={p.name} className="h-20 w-20 shrink-0 rounded-xl" />
               <div className="min-w-0 flex-1">
                 <Link href={`/place/${p.id}`} className="display-soft block truncate text-[16px] hover:text-accent">
                   {p.name}

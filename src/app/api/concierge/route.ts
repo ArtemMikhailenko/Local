@@ -9,6 +9,7 @@ import { LlmRateLimitError } from "@/lib/llm/types";
 import { HttpError, assertSameOrigin, clientIp, handleError } from "@/lib/http";
 import { places } from "@/lib/places";
 import { openAtFromHours } from "@/lib/places/osm";
+import { geocode } from "@/lib/geocode";
 import { getWeather, weatherHint } from "@/lib/weather";
 import { env } from "@/lib/env";
 import { anonConciergeLimiter, conciergeLimiter } from "@/lib/ratelimit";
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
               emit,
               signal: abort.signal,
               nowMinutes: hh * 60 + mm,
+              geocode: async (near) => (await geocode(near, { geoapifyKey: env.geoapifyKey || undefined, near: center, limit: 1 }))[0]?.location ?? null,
               // Hours are machine-checkable for OpenStreetMap venues; other providers return null (unknown).
               openAt: (place, minutes, dayOffset) => (place.id.startsWith("osm_") ? openAtFromHours(place.hours.join("; "), now, env.timeZone, minutes, dayOffset) : null),
             },

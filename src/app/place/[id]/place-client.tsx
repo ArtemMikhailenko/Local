@@ -7,7 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { IconArrow, IconBack, IconShare } from "@/components/icons";
 import { MapView } from "@/components/map-view";
 import { BasketButton } from "@/components/vote-basket";
-import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel } from "@/components/place-bits";
+import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel, fallbackFor } from "@/components/place-bits";
 import { api, ApiError, placeCache } from "@/lib/client/api";
 import { rememberViewed, sharePlace } from "@/lib/client/extras";
 import type { Place } from "@/lib/places/types";
@@ -77,7 +77,7 @@ export function PlaceClient({ id }: { id: string }) {
       <div className="relative">
         <div className="no-scrollbar flex h-[58vh] max-h-[520px] snap-x snap-mandatory overflow-x-auto" onScroll={(e) => setSlide(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
           {photos.map((src, i) => (
-            <Photo key={i} src={src} alt={`${place.name}, photo ${i + 1}`} className="h-full w-full shrink-0 snap-center" />
+            <Photo key={i} src={src} fallback={fallbackFor(place)} alt={`${place.name}, photo ${i + 1}`} className="h-full w-full shrink-0 snap-center" />
           ))}
         </div>
         <div className="absolute inset-x-0 top-0 flex justify-between p-3 pt-[max(env(safe-area-inset-top),12px)]">

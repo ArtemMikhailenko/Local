@@ -5,6 +5,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { haptic } from "@/lib/client/extras";
 import { distanceMeters, formatDistance, walkingMinutes, type LatLng } from "@/lib/geo";
+import { categoryPhoto } from "@/lib/places/category-photos";
 import type { Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
 import { IconHeart, IconStar, IconWalk } from "./icons";
@@ -82,19 +83,23 @@ export function IllustrativeTag({ className }: { className?: string }) {
   return <span className={clsx("rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm", className)}>{t("place.illustration")}</span>;
 }
 
-export function Photo({ src, alt, className }: { src?: string; alt: string; className?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) return <div className={clsx("bg-surface-2", className)} />;
+/** Image with a graceful fallback: a category photo when the real one fails (e.g. photo quota used up). */
+export function Photo({ src, alt, className, fallback }: { src?: string; alt: string; className?: string; fallback?: string }) {
+  const [failed, setFailed] = useState(0);
+  const url = failed === 0 ? src : failed === 1 ? fallback : undefined;
+  if (!url) return <div className={clsx("bg-surface-2", className)} />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={clsx("object-cover", className)} />;
+  return <img key={url} src={url} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed((f) => f + 1)} className={clsx("object-cover", className)} />;
 }
+
+export const fallbackFor = (p: Place) => categoryPhoto(p.type, p.id);
 
 /** Photo-first card for carousels. */
 export function PlaceCard({ place, center }: { place: Place; center: LatLng; index?: number }) {
   return (
     <Link href={`/place/${place.id}`} className="group block w-[250px] shrink-0 snap-start">
       <div className="relative overflow-hidden rounded-[20px] bg-surface-2">
-        <Photo src={place.photos[0]} alt={place.name} className="aspect-[4/5] w-full transition duration-500 group-hover:scale-[1.03]" />
+        <Photo src={place.photos[0]} fallback={fallbackFor(place)} alt={place.name} className="aspect-[4/5] w-full transition duration-500 group-hover:scale-[1.03]" />
         <SaveButton placeId={place.id} className="absolute right-3 top-3" />
         {place.photosIllustrative && <IllustrativeTag className="absolute bottom-3 left-3" />}
       </div>
@@ -110,7 +115,7 @@ export function PlaceCard({ place, center }: { place: Place; center: LatLng; ind
 export function PlaceRow({ place, center, right }: { place: Place; center: LatLng; right?: React.ReactNode; index?: number }) {
   return (
     <Link href={`/place/${place.id}`} className="rise flex items-center gap-3.5 rounded-2xl p-2 transition hover:bg-canvas active:scale-[0.99]">
-      <Photo src={place.photos[0]} alt={place.name} className="h-[72px] w-[72px] shrink-0 rounded-2xl" />
+      <Photo src={place.photos[0]} fallback={fallbackFor(place)} alt={place.name} className="h-[72px] w-[72px] shrink-0 rounded-2xl" />
       <div className="min-w-0 flex-1">
         <div className="display-soft truncate text-[16px]">{place.name}</div>
         <Meta place={place} center={center} className="mt-1" />
