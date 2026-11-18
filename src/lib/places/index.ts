@@ -7,6 +7,7 @@ import { createOsmProvider, geoapifyTransport, overpassTransport, type FetchArea
 import { createDemoProvider } from "./demo";
 import { fetchSitePhoto, isUsableShareImage } from "./site-photo";
 import { createGoogleProvider } from "./google";
+import { withPlaceStore } from "./store";
 import type { Place, PlacesProvider, SearchParams } from "./types";
 
 /** Small TTL cache: keeps Google quota low and makes back-navigation instant. */
@@ -124,7 +125,7 @@ function osmShared(): PlacesProvider {
 }
 function googleShared(): PlacesProvider | null {
   if (placesMode() !== "google") return null;
-  return g.googleProvider ?? (g.googleProvider = withSitePhotos(cached(createGoogleProvider(env.googlePlacesKey))));
+  return g.googleProvider ?? (g.googleProvider = withSitePhotos(cached(withPlaceStore(createGoogleProvider(env.googlePlacesKey)))));
 }
 function build(): PlacesProvider {
   const mode = placesMode();

@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import sharp from "sharp";
 
-vi.mock("@/lib/db", () => ({ db: {}, schema: {} }));
-const { compress } = await import("@/app/api/photo/route");
+import { compress } from "@/lib/photo-compress";
 
 describe("stored venue photos are compressed", () => {
   it("re-encodes a large JPEG to WebP at most 900 px wide and smaller", async () => {

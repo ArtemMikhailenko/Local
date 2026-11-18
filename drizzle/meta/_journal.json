@@ -71,6 +71,13 @@
       "when": 1795037360976,
       "tag": "0009_photo_files",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795038063316,
+      "tag": "0010_google_places",
+      "breakpoints": true
     }
   ]
 }

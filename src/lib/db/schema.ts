@@ -1,4 +1,4 @@
-import { customType, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
+import { boolean, customType, doublePrecision, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid, index } from "drizzle-orm/pg-core";
 import type { Place } from "@/lib/places/types";
 
 export const users = pgTable("users", {
@@ -179,3 +179,21 @@ export const photoFiles = pgTable("photo_files", {
   data: bytea("data").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Every Google venue we have seen, kept for good: rating, reviews, description, hours, photos.
+ * Place pages read it instead of calling Google when it is under a day old, and searches fall
+ * back to it when Google is down or out of quota. Demo shortcut like photo_files (see README).
+ */
+export const googlePlaces = pgTable(
+  "google_places",
+  {
+    id: text("id").primaryKey(),
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    place: jsonb("place").$type<Place>().notNull(),
+    hasDetails: boolean("has_details").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("google_places_geo_idx").on(t.lat, t.lng)],
+);
