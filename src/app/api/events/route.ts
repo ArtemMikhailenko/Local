@@ -12,6 +12,7 @@ const Body = z.object({
   title: z.string().trim().min(1).max(100),
   startsAt: z.string().datetime({ offset: true }),
   note: z.string().trim().max(400).optional(),
+  isPublic: z.boolean().optional(),
 });
 
 /** Create a meetup at a place. The place snapshot is fetched server-side, never trusted from the client. */
@@ -27,6 +28,8 @@ export async function POST(req: Request) {
     const place = await places.details(body.data.placeId);
     if (!place) throw new HttpError(404, "Place not found");
     const user = await getSessionUser();
+    // Public events are visible to strangers, so they need an account (spam and abuse control).
+    if (body.data.isPublic && !user) throw new HttpError(401, "Sign in to publish a public event");
     const id = newPollId();
     await db.insert(schema.events).values({
       id,
@@ -35,6 +38,7 @@ export async function POST(req: Request) {
       place: { ...place, reviews: [] },
       startsAt,
       note: body.data.note || null,
+      visibility: body.data.isPublic ? "public" : "private",
     });
     return json({ id }, 201);
   } catch (err) {

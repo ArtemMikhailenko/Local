@@ -30,7 +30,7 @@ export function AuthSheet() {
 
   const field = "mt-3 w-full rounded-xl border border-line bg-canvas px-4 py-3.5 text-[16px] outline-none transition placeholder:text-muted focus:border-accent";
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={closeAuth}>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40" onClick={closeAuth}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}

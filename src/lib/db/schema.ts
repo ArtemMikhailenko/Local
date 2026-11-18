@@ -98,8 +98,10 @@ export const events = pgTable("events", {
   place: jsonb("place").$type<Place>().notNull(),
   startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
   note: text("note"),
+  /** private: only people with the link see it. public: shown to everyone on the map (needs an account). */
+  visibility: text("visibility").$type<"private" | "public">().notNull().default("private"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [index("events_public_idx").on(t.visibility, t.startsAt)]);
 
 export const eventRsvps = pgTable(
   "event_rsvps",

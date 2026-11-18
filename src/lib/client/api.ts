@@ -23,7 +23,16 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export type User = { id: string; name: string; email: string };
 export type SavedRow = { place: Place; note: string | null; savedAt: string };
 
+export type PublicEvent = {
+  id: string;
+  title: string;
+  startsAt: string;
+  going: number;
+  place: { id: string; name: string; type: string; location: { lat: number; lng: number }; photo: string | null };
+};
+
 export const api = {
+  publicEvents: (lat: number, lng: number) => request<{ events: PublicEvent[] }>(`/api/events/public?lat=${lat}&lng=${lng}`),
   me: () => request<{ user: User | null; mode: "google" | "osm" | "demo" }>("/api/me"),
   login: (email: string, password: string) => request<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
   signup: (name: string, email: string, password: string) =>

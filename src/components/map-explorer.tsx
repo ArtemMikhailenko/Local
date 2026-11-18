@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { api } from "@/lib/client/api";
+import { api, type PublicEvent } from "@/lib/client/api";
 import type { LatLng } from "@/lib/geo";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
@@ -12,17 +12,22 @@ import { MapView } from "./map-view";
 import { Meta, Photo, SaveButton, coverOf, fallbackFor } from "./place-bits";
 import { BasketButton } from "./vote-basket";
 
+const fmtWhen = (iso: string, lang: string) =>
+  new Date(iso).toLocaleString(lang === "uk" ? "uk-UA" : "en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
 /**
  * Full-screen map: pick a category, drag anywhere to load that area, tap a pin to preview the
  * place in the strip at the bottom (and swipe the strip to move between places).
  */
 export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; onClose: () => void; initialCat?: number }) {
-  const { center, t } = useApp();
+  const { center, t, lang } = useApp();
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>(CATEGORIES[initialCat]);
   const [area, setArea] = useState<LatLng>(center);
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState<string | undefined>();
+  const [events, setEvents] = useState<PublicEvent[]>([]);
+  const [eventsMode, setEventsMode] = useState(false);
   const strip = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,6 +44,19 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
     };
   }, [open, cat, area]);
 
+  // Public events are shown on top of any category; the "Events" chip shows only them.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    api
+      .publicEvents(area.lat, area.lng)
+      .then((r) => alive && setEvents(r.events))
+      .catch(() => alive && setEvents([]));
+    return () => {
+      alive = false;
+    };
+  }, [open, area]);
+
   useEffect(() => {
     if (!active || !strip.current) return;
     strip.current.querySelector<HTMLElement>(`[data-id="${CSS.escape(active)}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
@@ -54,34 +72,66 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
             <IconBack className="h-5 w-5" />
           </button>
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
+            <button
+              onClick={() => (setEventsMode(true), setActive(events[0]?.id))}
+              className={clsx("shrink-0 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", eventsMode ? "bg-accent text-accent-ink" : "bg-white text-text")}
+            >
+              🗓 {t("map.events")}
+              {events.length > 0 && <span className={clsx("ml-1.5 rounded-full px-1.5 text-[12px]", eventsMode ? "bg-white/25" : "bg-accent text-accent-ink")}>{events.length}</span>}
+            </button>
             {CATEGORIES.map((c) => (
               <button
                 key={c.key}
-                onClick={() => setCat(c)}
-                className={clsx("shrink-0 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", c.key === cat.key ? "bg-text text-white" : "bg-white text-text")}
+                onClick={() => (setEventsMode(false), setCat(c))}
+                className={clsx("shrink-0 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", !eventsMode && c.key === cat.key ? "bg-text text-white" : "bg-white text-text")}
               >
                 {c.emoji} {t(`cat.${c.key}`)}
               </button>
             ))}
           </div>
         </div>
-        {!loading && <div className="w-fit rounded-full bg-white px-3 py-1 text-[12px] font-medium shadow">{t("map.inView", { n: places.length })}</div>}
+        {eventsMode ? (
+          <div className="w-fit max-w-full rounded-full bg-white px-3 py-1 text-[12px] font-medium shadow">{events.length ? t("map.eventsIn", { n: events.length }) : t("map.noEvents")}</div>
+        ) : (
+          !loading && <div className="w-fit rounded-full bg-white px-3 py-1 text-[12px] font-medium shadow">{t("map.inView", { n: places.length })}</div>
+        )}
       </div>
 
       <MapView
-        places={places}
+        places={eventsMode ? [] : places}
+        events={events}
+        onSelectEvent={(id) => (setEventsMode(true), setActive(id))}
         center={center}
         activeId={active}
         onAreaChange={setArea}
         onSelect={setActive}
-        loading={loading}
+        loading={loading && !eventsMode}
         keepView
         zoom={15}
         className="h-[100dvh] w-full"
       />
 
       <div ref={strip} className="no-scrollbar absolute inset-x-0 bottom-0 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-[max(env(safe-area-inset-bottom),16px)] pt-2">
-        {places.map((p) => (
+        {eventsMode &&
+          events.map((e) => (
+            <div key={e.id} data-id={e.id} onClick={() => setActive(e.id)} className={clsx("card w-[86%] shrink-0 snap-center p-3 transition", e.id === active ? "ring-2 ring-accent" : "opacity-95")}>
+              <div className="flex gap-3">
+                <Photo src={e.place.photo ?? undefined} fallback={fallbackFor({ ...e.place, photos: [], photosIllustrative: true } as unknown as Place)} alt={e.place.name} className="h-20 w-20 shrink-0 rounded-xl" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-semibold text-accent">🗓 {fmtWhen(e.startsAt, lang)}</div>
+                  <div className="display-soft truncate text-[16px]">{e.title}</div>
+                  <div className="truncate text-[13px] text-muted">
+                    {e.place.name}
+                    {e.going > 0 && ` · ${t("ev.goingCount", { n: e.going })}`}
+                  </div>
+                </div>
+              </div>
+              <Link href={`/concierge?event=${e.id}`} className="mt-2.5 inline-flex h-10 w-full items-center justify-center rounded-full bg-accent text-[14px] font-semibold text-accent-ink">
+                {lang === "uk" ? "Долучитися" : "Join"}
+              </Link>
+            </div>
+          ))}
+        {!eventsMode && places.map((p) => (
           <div
             key={p.id}
             data-id={p.id}

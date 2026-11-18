@@ -25,6 +25,7 @@ async function state(id: string, voterId?: string) {
     place: ev.place,
     startsAt: ev.startsAt,
     note: ev.note,
+    isPublic: ev.visibility === "public",
     past: ev.startsAt.getTime() < Date.now() - 3 * 60 * 60_000,
     ...summarize(rsvps),
     mine: me ? { name: me.name, status: me.status } : null,

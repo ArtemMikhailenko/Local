@@ -50,6 +50,13 @@
       "when": 1795029914295,
       "tag": "0006_street_views",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795030824233,
+      "tag": "0007_public_events",
+      "breakpoints": true
     }
   ]
 }

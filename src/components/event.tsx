@@ -17,6 +17,7 @@ type EventState = {
   place: Place;
   startsAt: string;
   note: string | null;
+  isPublic?: boolean;
   past: boolean;
   going: string[];
   maybe: string[];
@@ -69,8 +70,9 @@ export function CreateEventButton({ place, className }: { place: Place; classNam
 }
 
 export function CreateEventSheet({ place, open, onClose }: { place: Place; open: boolean; onClose: () => void }) {
-  const { t, toast, lang } = useApp();
+  const { t, toast, lang, user, openAuth } = useApp();
   const router = useRouter();
+  const [isPublic, setIsPublic] = useState(false);
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState(defaultWhen);
   const [note, setNote] = useState("");
@@ -91,7 +93,7 @@ export function CreateEventSheet({ place, open, onClose }: { place: Place; open:
     const finalTitle = title.trim() || t("ev.defaultTitle", { place: place.name });
     try {
       const startsAt = new Date(when).toISOString();
-      const res = await fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placeId: place.id, title: finalTitle, startsAt, note }) });
+      const res = await fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placeId: place.id, title: finalTitle, startsAt, note, isPublic }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not create the event");
       rememberEvent(data.id);
@@ -122,6 +124,25 @@ export function CreateEventSheet({ place, open, onClose }: { place: Place; open:
         <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder={t("ev.defaultTitle", { place: place.name })} />
         <input className={field} type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} required />
         <textarea className={clsx(field, "resize-none")} rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={400} placeholder={t("ev.notePh")} />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPublic}
+          onClick={() => {
+            // Public events need an account; private ones work without sign-up.
+            if (!isPublic && !user) return openAuth();
+            setIsPublic(!isPublic);
+          }}
+          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">🌍 {t("ev.public")}</span>
+            <span className="block text-[13px] text-muted">{isPublic ? t("ev.publicHint") : t("ev.privateHint")}</span>
+          </span>
+          <span className={clsx("relative h-7 w-12 shrink-0 rounded-full transition", isPublic ? "bg-accent" : "bg-line-strong")}>
+            <span className={clsx("absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all", isPublic ? "left-6" : "left-1")} />
+          </span>
+        </button>
         <button disabled={busy} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink disabled:opacity-60">
           <IconShare className="h-4 w-4" />
           {t("ev.createShare")}
@@ -187,6 +208,7 @@ export function EventPanel({ eventId }: { eventId: string }) {
       <div className="relative">
         <Photo src={coverOf(ev.place)} fallback={[...fallbackFor(ev.place), ev.place.photos[0]]} alt={ev.place.name} className="aspect-[16/9] w-full" />
         <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-[13px] font-semibold shadow">🗓 {when}</span>
+        {ev.isPublic && <span className="absolute right-3 top-3 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-accent-ink shadow">🌍 {t("ev.publicBadge")}</span>}
       </div>
       <div className="p-4">
         <h2 className="display text-[24px]">{ev.title}</h2>

@@ -1,3 +1,4 @@
+import { distanceMeters, type LatLng } from "./geo";
 import type { Place } from "./places/types";
 
 export type RsvpStatus = "going" | "maybe" | "no";
@@ -32,4 +33,18 @@ export function toIcs(e: { id: string; title: string; place: Place; startsAt: Da
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
+}
+
+/** Public events stay on the map from 3 h after start back to two weeks ahead. */
+export const PUBLIC_WINDOW = { pastMs: 3 * 60 * 60_000, aheadMs: 14 * 24 * 60 * 60_000 };
+export const PUBLIC_RADIUS_M = 6000;
+
+/** Upcoming public events around a point, soonest first. */
+export function nearbyEvents<T extends { startsAt: Date; place: { location: LatLng } }>(rows: T[], at: LatLng, now = Date.now(), radius = PUBLIC_RADIUS_M): T[] {
+  return rows
+    .filter((e) => {
+      const t = e.startsAt.getTime();
+      return t >= now - PUBLIC_WINDOW.pastMs && t <= now + PUBLIC_WINDOW.aheadMs && distanceMeters(at, e.place.location) <= radius;
+    })
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 }

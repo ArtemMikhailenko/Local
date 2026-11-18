@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Map as MlMap, Marker } from "maplibre-gl";
 import { distanceMeters, type LatLng } from "@/lib/geo";
 import type { Place } from "@/lib/places/types";
+import type { PublicEvent } from "@/lib/client/api";
 import { useApp } from "./app-provider";
 
 // Free vector tiles, no key: https://openfreemap.org
@@ -31,8 +32,13 @@ export function MapView({
   loading,
   onSelect,
   keepView,
+  events = [],
+  onSelectEvent,
 }: {
   places: Place[];
+  /** Public events: drawn as dark "date" pins above the venue pins. */
+  events?: PublicEvent[];
+  onSelectEvent?: (id: string) => void;
   center: LatLng;
   className?: string;
   activeId?: string;
@@ -51,11 +57,11 @@ export function MapView({
   const userMoved = useRef(false);
   const lastReported = useRef<LatLng>(center);
   const router = useRouter();
-  const { t } = useApp();
+  const { t, lang } = useApp();
   const [hint, setHint] = useState(false);
   // Refs so map callbacks always see the latest props, not the first render's.
-  const latest = useRef({ places, activeId, onAreaChange, onSelect });
-  latest.current = { places, activeId, onAreaChange, onSelect };
+  const latest = useRef({ places, activeId, onAreaChange, onSelect, events, onSelectEvent, lang });
+  latest.current = { places, activeId, onAreaChange, onSelect, events, onSelectEvent, lang };
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +131,34 @@ export function MapView({
       pin.onclick = () => (latest.current.onSelect ? latest.current.onSelect(p.id) : router.push(`/place/${p.id}`));
       return new maplibregl.Marker({ element: pin, anchor: "left", offset: [-6, 0] }).setLngLat([p.location.lng, p.location.lat]).addTo(m);
     });
+    const { events, onSelectEvent, lang } = latest.current;
+    const fmt = (iso: string) => {
+      const d = new Date(iso);
+      const loc = lang === "uk" ? "uk-UA" : "en-GB";
+      const today = new Date().toDateString() === d.toDateString();
+      const time = d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
+      return today ? time : `${d.toLocaleDateString(loc, { weekday: "short" })} ${time}`;
+    };
+    for (const e of events) {
+      const pin = document.createElement("button");
+      pin.setAttribute("aria-label", e.title);
+      const active = e.id === activeId;
+      pin.className = `flex items-center gap-1 rounded-2xl rounded-bl-sm px-2.5 py-1 text-left text-[11px] font-semibold leading-tight text-white shadow-lg ${active ? "bg-[#f2543d]" : "bg-[#1c1b1a]"}`;
+      pin.innerHTML = "";
+      const when = document.createElement("span");
+      when.className = "rounded-full bg-white/20 px-1.5 py-px";
+      when.textContent = `🗓 ${fmt(e.startsAt)}`;
+      const title = document.createElement("span");
+      title.textContent = short(e.title);
+      pin.append(when, title);
+      pin.onclick = () => (onSelectEvent ? onSelectEvent(e.id) : router.push(`/concierge?event=${e.id}`));
+      markers.current.push(new maplibregl.Marker({ element: pin, anchor: "bottom-left", offset: [0, -10] }).setLngLat([e.place.location.lng, e.place.location.lat]).addTo(m));
+    }
+    // Selected event off screen: glide to it.
+    const sel = events.find((e) => e.id === activeId);
+    if (sel && !m.getBounds().contains([sel.place.location.lng, sel.place.location.lat])) {
+      m.easeTo({ center: [sel.place.location.lng, sel.place.location.lat], duration: 600 });
+    }
     if (places.length >= 1 && !activeId && !userMoved.current && !keepView) {
       const b = new maplibregl.LngLatBounds();
       places.forEach((p) => b.extend([p.location.lng, p.location.lat]));
@@ -137,7 +171,7 @@ export function MapView({
     if (!ready.current) return;
     loadMaplibre().then((maplibregl) => drawMarkers(maplibregl));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [places, activeId]);
+  }, [places, activeId, events]);
 
   return (
     <div className="relative">
