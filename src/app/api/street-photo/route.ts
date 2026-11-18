@@ -24,19 +24,27 @@ export async function GET(req: Request) {
   const bbox = [at.lng - d, at.lat - d, at.lng + d, at.lat + d].map((n) => n.toFixed(6)).join(",");
   try {
     const res = await fetch(
-      `https://graph.mapillary.com/images?access_token=${encodeURIComponent(token)}&fields=id,thumb_1024_url,thumb_original_url,computed_geometry,geometry,is_pano&bbox=${bbox}&limit=20`,
+      `https://graph.mapillary.com/images?access_token=${encodeURIComponent(token)}&fields=id,computed_geometry,geometry,is_pano&bbox=${bbox}&limit=20`,
       { next: { revalidate: 3_600 }, signal: AbortSignal.timeout(8000) },
     );
     if (!res.ok) return notFound(`mapillary-${res.status}`);
     const { data } = (await res.json()) as { data?: MlyImage[] };
+    // The bbox search returns positions only; thumbnails come from a per-image lookup.
     const best = (data ?? [])
-      .map((i) => ({ i, thumb: i.thumb_1024_url ?? i.thumb_original_url, geo: (i.computed_geometry ?? i.geometry)?.coordinates }))
-      // Some images have only the raw GPS point, not a computed one: accept either.
-      .filter((x) => x.thumb?.startsWith("https://") && x.geo)
+      .map((i) => ({ i, geo: (i.computed_geometry ?? i.geometry)?.coordinates }))
+      .filter((x) => x.geo)
       .map((x) => ({ ...x, dist: distanceMeters(at, { lng: x.geo![0], lat: x.geo![1] }) + (x.i.is_pano ? 30 : 0) }))
       .sort((a, b) => a.dist - b.dist)[0];
-    if (!best) return notFound(`no-usable-images-${(data ?? []).length}-${Object.keys(data?.[0] ?? {}).join("+")}`);
-    return new Response(null, { status: 302, headers: { Location: best.thumb!, "Cache-Control": "public, max-age=1800" } });
+    if (!best) return notFound(`no-images-${(data ?? []).length}`);
+    const one = await fetch(`https://graph.mapillary.com/${best.i.id}?access_token=${encodeURIComponent(token)}&fields=thumb_1024_url,thumb_original_url`, {
+      next: { revalidate: 1_800 },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!one.ok) return notFound(`thumb-${one.status}`);
+    const img = (await one.json()) as { thumb_1024_url?: string; thumb_original_url?: string };
+    const thumb = img.thumb_1024_url ?? img.thumb_original_url;
+    if (!thumb?.startsWith("https://")) return notFound("no-thumb");
+    return new Response(null, { status: 302, headers: { Location: thumb, "Cache-Control": "public, max-age=1800" } });
   } catch (e) {
     return notFound(`error-${e instanceof Error ? e.name : "unknown"}`);
   }
