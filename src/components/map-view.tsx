@@ -15,6 +15,8 @@ type Ml = typeof import("maplibre-gl");
 // maplibre-gl v5 ships CJS/UMD; normalise default vs namespace interop.
 const loadMaplibre = () => import("maplibre-gl").then((m) => ((m as unknown as { default?: Ml }).default ?? m) as Ml);
 
+const CAL_SVG =
+  '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
 const short = (s: string) => (s.length > 18 ? `${s.slice(0, 17)}…` : s);
 
 /**
@@ -32,6 +34,7 @@ export function MapView({
   loading,
   onSelect,
   keepView,
+  quiet,
   events = [],
   onSelectEvent,
 }: {
@@ -49,6 +52,8 @@ export function MapView({
   onSelect?: (id: string) => void;
   /** Never auto-fit to markers (the explorer keeps the user's view). */
   keepView?: boolean;
+  /** No loading / drag hint over the map (the page shows its own status). */
+  quiet?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MlMap | null>(null);
@@ -146,8 +151,9 @@ export function MapView({
       pin.className = `flex items-center gap-1 rounded-2xl rounded-bl-sm px-2.5 py-1 text-left text-[11px] font-semibold leading-tight text-white shadow-lg ${active ? "bg-[#f2543d]" : "bg-[#1c1b1a]"}`;
       pin.innerHTML = "";
       const when = document.createElement("span");
-      when.className = "rounded-full bg-white/20 px-1.5 py-px";
-      when.textContent = `🗓 ${fmt(e.startsAt)}`;
+      when.className = "inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-px";
+      when.innerHTML = CAL_SVG;
+      when.append(fmt(e.startsAt));
       const title = document.createElement("span");
       title.textContent = short(e.title);
       pin.append(when, title);
@@ -176,7 +182,7 @@ export function MapView({
   return (
     <div className="relative">
       <div ref={el} className={className} />
-      {(loading || hint) && (
+      {!quiet && (loading || hint) && (
         <span className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-[12px] font-medium text-[#1c1b1a] shadow-md">
           {loading ? t("map.loading") : t("map.hint")}
         </span>

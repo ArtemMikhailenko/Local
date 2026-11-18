@@ -8,6 +8,7 @@ import clsx from "clsx";
 import type { Place } from "@/lib/places/types";
 import type { RsvpStatus } from "@/lib/events";
 import { useApp } from "./app-provider";
+import { Glyph } from "@/components/glyph";
 import { IconShare } from "./icons";
 import { Meta, Photo, coverOf, fallbackFor } from "./place-bits";
 
@@ -62,7 +63,8 @@ export function CreateEventButton({ place, className }: { place: Place; classNam
   return (
     <>
       <button onClick={() => setOpen(true)} className={clsx("inline-flex h-12 items-center justify-center gap-2 rounded-full bg-text px-5 text-[15px] font-semibold text-white", className)}>
-        🗓 {t("ev.create")}
+        <Glyph name="event-add" className="h-5 w-5" />
+        {t("ev.create")}
       </button>
       <CreateEventSheet place={place} open={open} onClose={() => setOpen(false)} />
     </>
@@ -136,7 +138,7 @@ export function CreateEventSheet({ place, open, onClose }: { place: Place; open:
           className="mt-3 flex w-full items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3 text-left"
         >
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">🌍 {t("ev.public")}</span>
+            <span className="flex items-center gap-1.5 text-[15px] font-semibold"><Glyph name="public" className="h-5 w-5 text-accent" />{t("ev.public")}</span>
             <span className="block text-[13px] text-muted">{isPublic ? t("ev.publicHint") : t("ev.privateHint")}</span>
           </span>
           <span className={clsx("relative h-7 w-12 shrink-0 rounded-full transition", isPublic ? "bg-accent" : "bg-line-strong")}>
@@ -207,8 +209,8 @@ export function EventPanel({ eventId }: { eventId: string }) {
     <div className="card rise overflow-hidden">
       <div className="relative">
         <Photo src={coverOf(ev.place)} fallback={[...fallbackFor(ev.place), ev.place.photos[0]]} alt={ev.place.name} className="aspect-[16/9] w-full" />
-        <span className="absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-[13px] font-semibold shadow">🗓 {when}</span>
-        {ev.isPublic && <span className="absolute right-3 top-3 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-accent-ink shadow">🌍 {t("ev.publicBadge")}</span>}
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[13px] font-semibold shadow"><Glyph name="event" className="h-4 w-4 text-accent" />{when}</span>
+        {ev.isPublic && <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-accent-ink shadow"><Glyph name="public" className="h-4 w-4" />{t("ev.publicBadge")}</span>}
       </div>
       <div className="p-4">
         <h2 className="display text-[24px]">{ev.title}</h2>
@@ -226,7 +228,7 @@ export function EventPanel({ eventId }: { eventId: string }) {
             </div>
           ))}
         </div>
-        {ev.going.length > 0 && <p className="mt-2 text-[13px] text-muted">✓ {ev.going.join(", ")}</p>}
+        {ev.going.length > 0 && <p className="mt-2 flex items-start gap-1 text-[13px] text-muted"><Glyph name="check" weight="bold" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />{ev.going.join(", ")}</p>}
 
         {!ev.past && (
           <>
@@ -248,7 +250,8 @@ export function EventPanel({ eventId }: { eventId: string }) {
 
         <div className="mt-3 grid grid-cols-2 gap-2">
           <a href={`/api/events/${ev.id}/ics`} className="flex h-11 items-center justify-center rounded-full bg-surface-2 text-[14px] font-semibold">
-            📅 {t("ev.calendar")}
+            <Glyph name="event-check" className="mr-1.5 h-5 w-5 text-accent" />
+            {t("ev.calendar")}
           </a>
           <button onClick={() => shareEvent(ev.id, ev.title, when, lang, toast)} className="flex h-11 items-center justify-center gap-2 rounded-full bg-accent-soft text-[14px] font-semibold text-accent">
             <IconShare className="h-4 w-4" />

@@ -12,6 +12,7 @@ import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, pric
 import { api, ApiError, placeCache } from "@/lib/client/api";
 import { rememberViewed, sharePlace } from "@/lib/client/extras";
 import type { Place } from "@/lib/places/types";
+import { directionsUrl } from "@/lib/route";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -124,8 +125,8 @@ export function PlaceClient({ id }: { id: string }) {
         {place.summary && <p className="mt-5 text-[17px] leading-relaxed text-text/90">{place.summary}</p>}
 
         <div className="mt-6 grid grid-cols-[1fr_auto] gap-2">
-          {place.mapsUrl && (
-            <a href={place.mapsUrl} target="_blank" rel="noreferrer" className="flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink">
+          {place.location && (
+            <a href={directionsUrl(place, center)} target="_blank" rel="noreferrer" className="flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink">
               {t("place.directions")}
               <IconArrow />
             </a>

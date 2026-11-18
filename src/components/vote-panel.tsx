@@ -7,6 +7,7 @@ import { ApiError } from "@/lib/client/api";
 import type { Place } from "@/lib/places/types";
 import type { Tally } from "@/lib/polls";
 import { useApp } from "./app-provider";
+import { Glyph } from "@/components/glyph";
 import { CreateEventSheet } from "./event";
 import { IconShare } from "./icons";
 import { Photo, coverOf, fallbackFor } from "./place-bits";
@@ -157,7 +158,8 @@ export function VotePanel({ pollId }: { pollId: string }) {
       </div>
       {poll.leader && (
         <button onClick={() => setEventOpen(true)} className="flex h-11 w-full items-center justify-center rounded-full bg-text text-[15px] font-semibold text-white">
-          🗓 {t("ev.fromVote")}
+          <Glyph name="event-add" className="h-5 w-5" />
+          {t("ev.fromVote")}
         </button>
       )}
       {poll.leader && <CreateEventSheet place={poll.places.find((p) => p.id === poll.leader)!} open={eventOpen} onClose={() => setEventOpen(false)} />}

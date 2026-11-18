@@ -7,6 +7,7 @@ import { api, type PublicEvent } from "@/lib/client/api";
 import type { LatLng } from "@/lib/geo";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
+import { Glyph } from "@/components/glyph";
 import { IconBack } from "./icons";
 import { MapView } from "./map-view";
 import { Meta, Photo, SaveButton, coverOf, fallbackFor } from "./place-bits";
@@ -74,18 +75,20 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
           <div className="no-scrollbar flex gap-2 overflow-x-auto">
             <button
               onClick={() => (setEventsMode(true), setActive(events[0]?.id))}
-              className={clsx("shrink-0 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", eventsMode ? "bg-accent text-accent-ink" : "bg-white text-text")}
+              className={clsx("inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", eventsMode ? "bg-accent text-accent-ink" : "bg-white text-text")}
             >
-              🗓 {t("map.events")}
-              {events.length > 0 && <span className={clsx("ml-1.5 rounded-full px-1.5 text-[12px]", eventsMode ? "bg-white/25" : "bg-accent text-accent-ink")}>{events.length}</span>}
+              <Glyph name="event" className="h-[18px] w-[18px]" />
+              {t("map.events")}
+              {events.length > 0 && <span className={clsx("rounded-full px-1.5 text-[12px]", eventsMode ? "bg-white/25" : "bg-accent text-accent-ink")}>{events.length}</span>}
             </button>
             {CATEGORIES.map((c) => (
               <button
                 key={c.key}
                 onClick={() => (setEventsMode(false), setCat(c))}
-                className={clsx("shrink-0 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", !eventsMode && c.key === cat.key ? "bg-text text-white" : "bg-white text-text")}
+                className={clsx("inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[14px] font-medium shadow-md", !eventsMode && c.key === cat.key ? "bg-text text-white" : "bg-white text-text")}
               >
-                {c.emoji} {t(`cat.${c.key}`)}
+                <Glyph name={c.key} className={clsx("h-[18px] w-[18px]", !eventsMode && c.key === cat.key ? "text-white" : "text-accent")} />
+                {t(`cat.${c.key}`)}
               </button>
             ))}
           </div>
@@ -93,7 +96,7 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
         {eventsMode ? (
           <div className="w-fit max-w-full rounded-full bg-white px-3 py-1 text-[12px] font-medium shadow">{events.length ? t("map.eventsIn", { n: events.length }) : t("map.noEvents")}</div>
         ) : (
-          !loading && <div className="w-fit rounded-full bg-white px-3 py-1 text-[12px] font-medium shadow">{t("map.inView", { n: places.length })}</div>
+          <div className="w-fit rounded-full bg-white px-3 py-1 text-[12px] font-medium shadow">{loading ? t("map.loading") : t("map.inView", { n: places.length })}</div>
         )}
       </div>
 
@@ -105,7 +108,7 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
         activeId={active}
         onAreaChange={setArea}
         onSelect={setActive}
-        loading={loading && !eventsMode}
+        quiet
         keepView
         zoom={15}
         className="h-[100dvh] w-full"
@@ -118,7 +121,7 @@ export function MapExplorer({ open, onClose, initialCat = 2 }: { open: boolean; 
               <div className="flex gap-3">
                 <Photo src={e.place.photo ?? undefined} fallback={fallbackFor({ ...e.place, photos: [], photosIllustrative: true } as unknown as Place)} alt={e.place.name} className="h-20 w-20 shrink-0 rounded-xl" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-semibold text-accent">🗓 {fmtWhen(e.startsAt, lang)}</div>
+                  <div className="flex items-center gap-1 text-[12px] font-semibold text-accent"><Glyph name="event" className="h-4 w-4" />{fmtWhen(e.startsAt, lang)}</div>
                   <div className="display-soft truncate text-[16px]">{e.title}</div>
                   <div className="truncate text-[13px] text-muted">
                     {e.place.name}

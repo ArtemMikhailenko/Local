@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Glyph } from "@/components/glyph";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -14,7 +15,7 @@ import { Photo, PlaceCard, PlaceRow, RowSkeleton, SectionTitle } from "@/compone
 import { api } from "@/lib/client/api";
 import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
 import { CATEGORIES, type Place } from "@/lib/places/types";
-import type { Weather } from "@/lib/weather";
+import { weatherIcon, type Weather } from "@/lib/weather";
 import { categoryPhoto } from "@/lib/places/category-photos";
 
 
@@ -117,7 +118,7 @@ export default function Discover() {
           </button>
           {weather && (
             <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-[14px] font-medium">
-              <span>{weather.emoji}</span>
+              <Glyph name={weatherIcon(weather)} className="h-[18px] w-[18px] text-accent" />
               {weather.tempC}°
             </Link>
           )}
@@ -154,7 +155,7 @@ export default function Discover() {
         </div>
         {weather && (weather.isRainy || weather.isCold || weather.isNice) && (
           <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="mt-3 flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 text-[14px] text-text">
-            <span className="text-lg">{weather.emoji}</span>
+            <Glyph name={weatherIcon(weather)} className="h-6 w-6 shrink-0 text-accent" />
             <span>
               {weather.label}, {weather.tempC}°. {weather.isNice ? t("home.weather.nice") : t("home.weather.cozy")}
             </span>
@@ -167,9 +168,9 @@ export default function Discover() {
           <button
             key={c.key}
             onClick={() => setCat(c)}
-            className={clsx("shrink-0 rounded-full px-4 py-2 text-[14px] font-medium transition", c.key === cat.key ? "bg-text text-white" : "bg-canvas text-text hover:bg-surface-2")}
+            className={clsx("inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-[14px] font-medium transition", c.key === cat.key ? "bg-text text-white" : "bg-canvas text-text hover:bg-surface-2")}
           >
-            <span className="mr-1.5">{c.emoji}</span>
+            <Glyph name={c.key} className={clsx("h-[18px] w-[18px]", c.key === cat.key ? "text-white" : "text-accent")} />
             {t(`cat.${c.key}`)}
           </button>
         ))}

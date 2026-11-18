@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { GeoHit } from "@/lib/geocode";
 import { useApp } from "./app-provider";
+import { Glyph } from "@/components/glyph";
 import { IconPin } from "./icons";
 
 /** Neighbourhoods and cities to explore from, without sharing your location. */
@@ -88,7 +89,7 @@ export function LocationSheet({ open, onClose }: { open: boolean; onClose: () =>
                   className="flex w-full items-center justify-between border-b border-line py-3.5 text-left text-[16px]"
                 >
                   {label}
-                  {active && <span className="text-accent">✓</span>}
+                  {active && <Glyph name="check" weight="bold" className="h-4 w-4 text-accent" />}
                 </button>
               </li>
             );

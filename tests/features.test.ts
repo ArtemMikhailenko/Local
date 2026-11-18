@@ -117,3 +117,18 @@ describe("events", () => {
     expect(ics.split("\r\n")[0]).toBe("BEGIN:VCALENDAR");
   });
 });
+
+import { directionsUrl, stopTarget } from "@/lib/route";
+
+describe("named route stops", () => {
+  const loc = { lat: 50.45, lng: 30.52 };
+  it("uses the Google place id so Maps shows the venue name", () => {
+    const u = new URL(directionsUrl({ id: "ChIJabcdefghijklmnop", name: "Veranda", location: loc }));
+    expect(u.searchParams.get("destination")).toBe("Veranda");
+    expect(u.searchParams.get("destination_place_id")).toBe("ChIJabcdefghijklmnop");
+  });
+  it("uses name and address for OpenStreetMap venues, coordinates only as a last resort", () => {
+    expect(stopTarget({ id: "osm_node_1", name: "Open Coffee", address: "Мала Житомирська вулиця", location: loc }).text).toBe("Open Coffee, Мала Житомирська вулиця");
+    expect(stopTarget({ id: "osm_node_1", name: "Open Coffee", address: "", location: loc }).text).toBe("50.450000,30.520000");
+  });
+});

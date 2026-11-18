@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { Glyph } from "@/components/glyph";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { useApp } from "@/components/app-provider";
@@ -117,7 +118,7 @@ function SearchInner() {
           <div className="mt-3 grid grid-cols-2 gap-3">
             {CATEGORIES.map((c) => (
               <button key={c.key} onClick={() => setQ(c.query)} className="group rounded-2xl bg-canvas p-4 text-left transition hover:bg-accent-soft">
-                <span className="text-2xl">{c.emoji}</span>
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-accent-soft text-accent"><Glyph name={c.key} className="h-6 w-6" /></span>
                 <span className="display mt-6 block text-[18px] group-hover:text-accent">{t(`cat.${c.key}`)}</span>
               </button>
             ))}

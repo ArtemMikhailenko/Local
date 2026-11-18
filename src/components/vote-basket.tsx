@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import type { Place } from "@/lib/places/types";
 import { useApp } from "./app-provider";
+import { Glyph } from "@/components/glyph";
 import { IconShare } from "./icons";
 import { Photo, fallbackFor } from "./place-bits";
 import { createPoll, sharePoll } from "./vote-panel";
@@ -22,7 +23,7 @@ export function BasketButton({ place, className }: { place: Place; className?: s
       }}
       className={clsx("inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-[15px] font-semibold transition", on ? "bg-accent-soft text-accent" : "bg-surface-2 text-text", className)}
     >
-      <span className="text-[17px] leading-none">{on ? "✓" : "＋"}</span>
+      <Glyph name={on ? "check" : "plus"} weight="bold" className="h-[18px] w-[18px]" />
       {on ? t("vote.added") : t("vote.add")}
     </button>
   );
@@ -62,7 +63,7 @@ export function VoteBasketBar() {
         </div>
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{t("vote.bar", { n: basket.length })}</span>
         <button onClick={clearBasket} aria-label="Clear" className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-canvas">
-          ✕
+          <Glyph name="close" weight="bold" className="h-4 w-4" />
         </button>
         <button onClick={start} disabled={busy} className="inline-flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-[14px] font-semibold text-accent-ink disabled:opacity-60">
           <IconShare className="h-4 w-4" />

@@ -1,5 +1,6 @@
 "use client";
 
+import { Glyph } from "@/components/glyph";
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -63,6 +64,14 @@ function ConciergeInner() {
   const eventParam = params.get("event");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Grow the box with the text (up to max-h), shrink back when it is cleared.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
   const busy = turns.some((t) => !t.done);
   const bottom = useRef<HTMLDivElement>(null);
   const started = useRef(false);
@@ -366,7 +375,7 @@ function ConciergeInner() {
                         <h3 className="display mt-1 text-[22px]">{p.place.name}</h3>
                         <Meta place={p.place} center={center} className="mt-1.5" />
                         <p className="mt-3 text-[15px] leading-relaxed text-text/85">{p.why}</p>
-                        {p.tip && <p className="mt-3 rounded-xl bg-canvas px-3 py-2 text-[14px] text-text/80">💡 {p.tip}</p>}
+                        {p.tip && <p className="mt-3 flex gap-2 rounded-xl bg-canvas px-3 py-2 text-[14px] text-text/80"><Glyph name="tip" className="mt-0.5 h-4 w-4 shrink-0 text-accent" /><span>{p.tip}</span></p>}
                       </div>
                     </Link>
                   ))}
@@ -429,20 +438,29 @@ function ConciergeInner() {
         className="sticky bottom-[92px] z-30 mt-2 pb-2"
       >
         <div className="card flex items-end gap-2 !rounded-[26px] p-1.5 pl-4">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                ask(input);
-              }
-            }}
-            rows={1}
-            maxLength={500}
-            placeholder={turns.length ? tr("c.placeholderMore") : tr("c.placeholder")}
-            className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted"
-          />
+          {/* Placeholder as a one-line overlay: a native textarea placeholder wraps and gets cut off. */}
+          <div className="relative min-w-0 flex-1">
+            {!input && (
+              <span aria-hidden className="pointer-events-none absolute inset-x-0 top-2.5 truncate text-[16px] text-muted">
+                {turns.length ? tr("c.placeholderMore") : tr("c.placeholder")}
+              </span>
+            )}
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  ask(input);
+                }
+              }}
+              rows={1}
+              maxLength={500}
+              aria-label={turns.length ? tr("c.placeholderMore") : tr("c.placeholder")}
+              className="block max-h-32 min-h-[44px] w-full resize-none bg-transparent py-2.5 text-[16px] outline-none"
+            />
+          </div>
           <VoiceButton disabled={busy} onText={setInput} onFinal={(t) => ask(t)} />
           <button disabled={busy || input.trim().length < 3} aria-label="Send" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition disabled:bg-surface-2 disabled:text-muted">
             <IconArrow />

@@ -5,6 +5,8 @@ export type Weather = {
   feelsC: number;
   label: string;
   emoji: string;
+  /** Icon name for the UI (see components/glyph). */
+  icon: string;
   isRainy: boolean;
   isCold: boolean;
   isNice: boolean;
@@ -13,17 +15,17 @@ export type Weather = {
 };
 
 /** WMO weather codes → short label + emoji (https://open-meteo.com/en/docs). */
-export function describeCode(code: number, isDay: boolean): { label: string; emoji: string; wet: boolean } {
-  if (code === 0) return { label: isDay ? "Clear" : "Clear night", emoji: isDay ? "☀️" : "🌙", wet: false };
-  if (code <= 2) return { label: "Partly cloudy", emoji: isDay ? "⛅" : "☁️", wet: false };
-  if (code === 3) return { label: "Overcast", emoji: "☁️", wet: false };
-  if (code <= 48) return { label: "Fog", emoji: "🌫️", wet: false };
-  if (code <= 57) return { label: "Drizzle", emoji: "🌦️", wet: true };
-  if (code <= 67) return { label: "Rain", emoji: "🌧️", wet: true };
-  if (code <= 77) return { label: "Snow", emoji: "🌨️", wet: true };
-  if (code <= 82) return { label: "Showers", emoji: "🌧️", wet: true };
-  if (code <= 86) return { label: "Snow showers", emoji: "🌨️", wet: true };
-  return { label: "Thunderstorm", emoji: "⛈️", wet: true };
+export function describeCode(code: number, isDay: boolean): { label: string; emoji: string; icon: string; wet: boolean } {
+  if (code === 0) return { label: isDay ? "Clear" : "Clear night", emoji: isDay ? "☀️" : "🌙", icon: isDay ? "sun" : "moon", wet: false };
+  if (code <= 2) return { label: "Partly cloudy", emoji: isDay ? "⛅" : "☁️", icon: isDay ? "cloud-sun" : "cloud-moon", wet: false };
+  if (code === 3) return { label: "Overcast", emoji: "☁️", icon: "cloud", wet: false };
+  if (code <= 48) return { label: "Fog", emoji: "🌫️", icon: "fog", wet: false };
+  if (code <= 57) return { label: "Drizzle", emoji: "🌦️", icon: "rain", wet: true };
+  if (code <= 67) return { label: "Rain", emoji: "🌧️", icon: "rain", wet: true };
+  if (code <= 77) return { label: "Snow", emoji: "🌨️", icon: "snow", wet: true };
+  if (code <= 82) return { label: "Showers", emoji: "🌧️", icon: "rain", wet: true };
+  if (code <= 86) return { label: "Snow showers", emoji: "🌨️", icon: "snow", wet: true };
+  return { label: "Thunderstorm", emoji: "⛈️", icon: "storm", wet: true };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -39,6 +41,7 @@ export function parseOpenMeteo(data: any): Weather {
     feelsC,
     label: d.label,
     emoji: d.emoji,
+    icon: d.icon,
     isRainy: d.wet || Number(c.precipitation) > 0.2,
     isCold: feelsC < 5,
     isNice: !d.wet && feelsC >= 16 && feelsC <= 30,
@@ -74,3 +77,7 @@ export async function getWeather(at: LatLng, fetchImpl: typeof fetch = fetch): P
     return null; // weather is a nice-to-have; never block the app on it
   }
 }
+
+const EMOJI_ICON: Record<string, string> = { "☀️": "sun", "🌙": "moon", "⛅": "cloud-sun", "☁️": "cloud", "🌫️": "fog", "🌦️": "rain", "🌧️": "rain", "🌨️": "snow", "⛈️": "storm" };
+/** Icon name, also for responses cached before the icon field existed. */
+export const weatherIcon = (w: Pick<Weather, "emoji"> & { icon?: string }) => w.icon || EMOJI_ICON[w.emoji] || "cloud";

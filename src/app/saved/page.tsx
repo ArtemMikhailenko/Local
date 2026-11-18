@@ -208,30 +208,34 @@ export default function SavedPage() {
 
   return (
     <main className="px-4 pt-[max(env(safe-area-inset-top),14px)]">
-      <header className="flex items-center justify-between gap-2 text-[14px]">
-        <span className="truncate text-text">
-          {user ? (
-            <>
-              {user.name} <span className="text-muted">· {user.email}</span>
-            </>
-          ) : null}
-        </span>
-        <button onClick={() => setLang(lang === "uk" ? "en" : "uk")} className="shrink-0 rounded-full bg-canvas px-3 py-1 font-semibold">
+      <header className="flex items-center justify-between">
+        <h1 className="display text-[34px]">{t("saved.title")}</h1>
+        <button onClick={() => setLang(lang === "uk" ? "en" : "uk")} aria-label="Language" className="rounded-full bg-canvas px-3 py-1.5 text-[14px] font-semibold">
           {lang === "uk" ? "EN" : "УКР"}
         </button>
+      </header>
+
+      {/* Profile card: who is signed in, or why to sign in. */}
+      <div className="card mt-4 flex items-center gap-3 p-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-[18px] font-bold text-accent-ink">
+          {user ? user.name[0]?.toUpperCase() : "?"}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold">{user ? user.name : t("saved.guest")}</span>
+          <span className="block truncate text-[13px] text-muted">{user ? user.email : t("saved.guestHint")}</span>
+        </span>
         {user ? (
-          <button onClick={logout} className="shrink-0 text-muted hover:text-text">
+          <button onClick={logout} className="shrink-0 rounded-full bg-canvas px-3 py-1.5 text-[13px] font-medium text-muted hover:text-text">
             {t("saved.signout")}
           </button>
         ) : (
-          <button onClick={openAuth} className="shrink-0 font-semibold text-accent">
+          <button onClick={openAuth} className="shrink-0 rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-accent-ink">
             {t("auth.signin")}
           </button>
         )}
-      </header>
+      </div>
 
-      <h1 className="display mt-6 text-[34px]">{t("saved.title")}</h1>
-      <div className="mt-4 grid grid-cols-3 rounded-full bg-canvas p-1">
+      <div className="mt-5 grid grid-cols-3 rounded-full bg-canvas p-1">
         {(["places", "votes", "chats"] as const).map((k) => (
           <button key={k} onClick={() => setTab(k)} className={tab === k ? "rounded-full bg-white py-2 text-[14px] font-semibold shadow-sm" : "py-2 text-[14px] font-medium text-muted"}>
             {t(`saved.tab.${k}`)}
