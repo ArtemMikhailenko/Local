@@ -7,7 +7,7 @@ import { useApp } from "@/components/app-provider";
 import { IconArrow, IconBack, IconShare } from "@/components/icons";
 import { MapView } from "@/components/map-view";
 import { BasketButton } from "@/components/vote-basket";
-import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel, fallbackFor } from "@/components/place-bits";
+import { IllustrativeTag, OpenBadge, Photo, Rating, SaveButton, Walk, pad2, priceLabel, fallbackFor, streetPhoto } from "@/components/place-bits";
 import { api, ApiError, placeCache } from "@/lib/client/api";
 import { rememberViewed, sharePlace } from "@/lib/client/extras";
 import type { Place } from "@/lib/places/types";
@@ -68,7 +68,8 @@ export function PlaceClient({ id }: { id: string }) {
       </main>
     );
 
-  const photos = place.photos.length ? place.photos : [undefined];
+  // Venues without their own photo: real street-level photo first (Mapillary), then the illustration.
+  const photos = place.photosIllustrative ? [streetPhoto(place), ...place.photos] : place.photos.length ? place.photos : [undefined];
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const host = place.website ? new URL(place.website).hostname.replace(/^www\./, "") : null;
 

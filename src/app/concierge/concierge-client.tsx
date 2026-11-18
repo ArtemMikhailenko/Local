@@ -10,7 +10,7 @@ import { PlanTimeline } from "@/components/plan-timeline";
 import { VoiceButton } from "@/components/voice-button";
 import { VotePanel, createPoll, sharePoll } from "@/components/vote-panel";
 import { walkingRouteUrl } from "@/lib/route";
-import { IllustrativeTag, Meta, Photo, SaveButton, fallbackFor } from "@/components/place-bits";
+import { IllustrativeTag, Meta, Photo, SaveButton, coverOf, fallbackFor } from "@/components/place-bits";
 import type { ConciergeEvent } from "@/lib/concierge/agent";
 import { placeCache } from "@/lib/client/api";
 import type { T } from "@/lib/i18n";
@@ -349,7 +349,7 @@ function ConciergeInner() {
                   {t.result.picks.map((p, i) => (
                     <Link key={p.place_id} href={`/place/${p.place.id}`} style={{ animationDelay: `${i * 120}ms` }} className="card rise block overflow-hidden">
                       <div className="relative">
-                        <Photo src={p.place.photos[0]} fallback={fallbackFor(p.place)} alt={p.place.name} className="aspect-[16/10] w-full" />
+                        <Photo src={coverOf(p.place)} fallback={[...fallbackFor(p.place), p.place.photos[0]]} alt={p.place.name} className="aspect-[16/10] w-full" />
                         <span className="absolute left-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-white text-[13px] font-bold shadow-sm">{i + 1}</span>
                         <SaveButton placeId={p.place.id} className="absolute right-3 top-3" />
                         {p.place.photosIllustrative && <IllustrativeTag className="absolute bottom-3 left-3" />}

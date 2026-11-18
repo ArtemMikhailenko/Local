@@ -6,7 +6,7 @@ import type { LatLng } from "@/lib/geo";
 import { walkingRouteUrl } from "@/lib/route";
 import { useApp } from "./app-provider";
 import { IconRoute, IconShare, IconWalk } from "./icons";
-import { Photo, fallbackFor } from "./place-bits";
+import { Photo, coverOf, fallbackFor } from "./place-bits";
 
 type PlanEvent = Extract<ConciergeEvent, { t: "plan" }>;
 
@@ -54,7 +54,7 @@ export function PlanTimeline({ plan, center }: { plan: PlanEvent; center: LatLng
               <div className="w-[52px] shrink-0 pt-1 text-center">
                 <div className="rounded-full bg-accent-soft py-1 text-[13px] font-bold text-accent">{s.time}</div>
               </div>
-              <Photo src={s.place.photos[0]} fallback={fallbackFor(s.place)} alt="" className="h-16 w-16 shrink-0 rounded-xl" />
+              <Photo src={coverOf(s.place)} fallback={[...fallbackFor(s.place), s.place.photos[0]]} alt="" className="h-16 w-16 shrink-0 rounded-xl" />
               <div className="min-w-0 flex-1 pb-1">
                 <div className="text-[12px] font-semibold text-accent">
                   {s.what} · {s.duration_min} min

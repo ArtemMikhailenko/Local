@@ -8,7 +8,7 @@ import type { Place } from "@/lib/places/types";
 import type { Tally } from "@/lib/polls";
 import { useApp } from "./app-provider";
 import { IconShare } from "./icons";
-import { Photo, fallbackFor } from "./place-bits";
+import { Photo, coverOf, fallbackFor } from "./place-bits";
 
 type PollState = { id: string; title: string; places: Place[]; tally: Tally[]; leader: string | null; total: number; myVote: string | null };
 const NAME_KEY = "locali:voter-name";
@@ -127,7 +127,7 @@ export function VotePanel({ pollId }: { pollId: string }) {
             >
               <span className="absolute inset-y-0 left-0 bg-accent-soft transition-all duration-500" style={{ width: `${(tl.votes / max) * 100}%` }} />
               <span className="relative flex items-center gap-3">
-                <Photo src={p.photos[0]} fallback={fallbackFor(p)} alt={p.name} className="h-14 w-14 shrink-0 rounded-xl" />
+                <Photo src={coverOf(p)} fallback={[...fallbackFor(p), p.photos[0]]} alt={p.name} className="h-14 w-14 shrink-0 rounded-xl" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-semibold">{p.name}</span>
