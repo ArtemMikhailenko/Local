@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -74,6 +75,14 @@ export function CreateEventSheet({ place, open, onClose }: { place: Place; open:
   const [when, setWhen] = useState(defaultWhen);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
   if (!open) return null;
 
   async function create(e: React.FormEvent) {
@@ -97,7 +106,8 @@ export function CreateEventSheet({ place, open, onClose }: { place: Place; open:
   }
 
   const field = "mt-3 w-full rounded-xl border border-line bg-canvas px-4 py-3 text-[16px] outline-none focus:border-accent";
-  return (
+  // Portal to <body>: an animated (transformed) parent would otherwise pin the sheet to the page bottom.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={onClose}>
       <form onClick={(e) => e.stopPropagation()} onSubmit={create} className="sheet-in w-full max-w-[480px] rounded-t-[28px] bg-surface px-5 pb-[max(env(safe-area-inset-bottom),20px)] pt-3">
         <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-line-strong" />
@@ -117,7 +127,8 @@ export function CreateEventSheet({ place, open, onClose }: { place: Place; open:
           {t("ev.createShare")}
         </button>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
