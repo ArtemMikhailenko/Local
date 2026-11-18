@@ -1,4 +1,4 @@
-import { ApiError, type Content, type GenerateContentResponse, type GoogleGenAI } from "@google/genai";
+import { ApiError, ThinkingLevel, type Content, type GenerateContentResponse, type GoogleGenAI } from "@google/genai";
 import { LlmRateLimitError, type LlmFactory, type LlmSession, type ToolCall } from "./types";
 
 type GenerateFn = (req: Parameters<GoogleGenAI["models"]["generateContent"]>[0]) => Promise<GenerateContentResponse>;
@@ -26,6 +26,8 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
                 tools: [{ functionDeclarations: tools.map((t) => ({ name: t.name, description: t.description, parametersJsonSchema: t.parameters })) }],
                 temperature: 0.6,
                 abortSignal: signal,
+                // Gemini 3+ thinks by default; for a snappy concierge keep it low.
+                ...(Number(models[i].match(/gemini-(\d+)/)?.[1] ?? 0) >= 3 ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
               },
             });
             break;
@@ -55,7 +57,10 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
         });
       },
       addUserText(text) {
-        contents.push({ role: "user", parts: [{ text }] });
+        // Merge into the previous user turn (e.g. right after tool results) instead of sending two user turns in a row.
+        const last = contents[contents.length - 1];
+        if (last?.role === "user") last.parts = [...(last.parts ?? []), { text }];
+        else contents.push({ role: "user", parts: [{ text }] });
       },
     };
   };

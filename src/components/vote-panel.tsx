@@ -23,7 +23,7 @@ export async function createPoll(title: string, placeIds: string[]): Promise<str
 export async function sharePoll(id: string, title: string, toast: (m: string) => void) {
   const url = `${location.origin}/concierge?poll=${id}`;
   try {
-    if (navigator.share) await navigator.share({ title: "Help us choose", text: `${title} · vote on Locali`, url });
+    if (navigator.share) await navigator.share({ title: "Help us choose", text: `${title}: vote on Locali`, url });
     else {
       await navigator.clipboard.writeText(url);
       toast("Vote link copied, send it to friends");
@@ -75,21 +75,21 @@ export function VotePanel({ pollId }: { pollId: string }) {
     setPoll(data);
   }
 
-  if (error) return <div className="rounded-2xl border border-line bg-surface p-5 text-center text-muted">{error}</div>;
-  if (!poll) return <div className="shimmer h-[320px] rounded-[26px]" />;
+  if (error) return <div className="card p-5 text-center text-muted">{error}</div>;
+  if (!poll) return <div className="skeleton h-[320px] !rounded-[20px]" />;
 
   const max = Math.max(1, ...poll.tally.map((t) => t.votes));
   return (
-    <div className="fade-up space-y-3 rounded-[28px] border border-ai/20 bg-surface p-4">
+    <div className="card rise space-y-4 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[12px] font-semibold uppercase tracking-wider text-ai">Decide together</div>
-          <h2 className="mt-1 font-display text-[28px] leading-[1.05]">{poll.title}</h2>
+          <div className="text-[13px] font-semibold text-accent">Let&apos;s decide together</div>
+          <h2 className="display mt-1 text-[22px]">{poll.title}</h2>
           <p className="mt-1 text-[13px] text-muted">
             {poll.total} {poll.total === 1 ? "vote" : "votes"} so far · updates live
           </p>
         </div>
-        <button onClick={() => sharePoll(poll.id, poll.title, toast)} aria-label="Share vote link" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ai/15 text-ai">
+        <button onClick={() => sharePoll(poll.id, poll.title, toast)} aria-label="Share vote link" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
           <IconShare />
         </button>
       </div>
@@ -99,7 +99,7 @@ export function VotePanel({ pollId }: { pollId: string }) {
         onChange={(e) => setName(e.target.value)}
         maxLength={30}
         placeholder="Your name"
-        className="w-full rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[15px] outline-none focus:border-ai/50"
+        className="w-full rounded-xl border border-line bg-canvas px-4 py-3 text-[16px] outline-none focus:border-accent"
       />
 
       <div className="space-y-2">
@@ -112,32 +112,32 @@ export function VotePanel({ pollId }: { pollId: string }) {
               key={p.id}
               disabled={busy}
               onClick={() => vote(p.id)}
-              className={clsx("relative w-full overflow-hidden rounded-2xl border p-2.5 text-left transition active:scale-[0.99]", mine ? "border-ai/60 bg-ai/10" : "border-line bg-surface-2/50")}
+              className={clsx("relative w-full overflow-hidden rounded-2xl border p-2.5 text-left transition active:scale-[0.99]", mine ? "border-accent" : "border-line")}
             >
-              <span className="absolute inset-y-0 left-0 bg-ai/15 transition-all duration-500" style={{ width: `${(t.votes / max) * 100}%` }} />
+              <span className="absolute inset-y-0 left-0 bg-accent-soft transition-all duration-500" style={{ width: `${(t.votes / max) * 100}%` }} />
               <span className="relative flex items-center gap-3">
                 <Photo src={p.photos[0]} alt={p.name} className="h-14 w-14 shrink-0 rounded-xl" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-[15px] font-semibold">{p.name}</span>
-                    {leading && <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-black">LEADING</span>}
+                    {leading && <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-ink">Leading</span>}
                   </span>
-                  <span className="block text-[12px] text-muted">{p.type}</span>
-                  {t.voters.length > 0 && <span className="mt-0.5 block truncate text-[12px] text-ai">{t.voters.join(", ")}</span>}
+                  <span className="block text-[13px] text-muted">{p.type}</span>
+                  {t.voters.length > 0 && <span className="mt-0.5 block truncate text-[12px] font-medium text-accent">{t.voters.join(", ")}</span>}
                 </span>
                 <span className="text-right">
-                  <span className="block font-display text-[26px] leading-none">{t.votes}</span>
-                  {mine && <span className="text-[10px] text-ai">your vote</span>}
+                  <span className="block text-[22px] font-bold leading-none">{t.votes}</span>
+                  {mine && <span className="text-[11px] text-accent">your vote</span>}
                 </span>
               </span>
             </button>
           );
         })}
       </div>
-      <div className="flex items-center justify-between pt-1 text-[12px] text-muted">
-        <span>Tap a place to vote. Tap another to change.</span>
+      <div className="flex items-center justify-between text-[13px] text-muted">
+        <span>Tap to vote, tap another to change.</span>
         {poll.leader && (
-          <Link href={`/place/${poll.leader}`} className="font-medium text-accent">
+          <Link href={`/place/${poll.leader}`} className="font-semibold text-accent">
             Open winner →
           </Link>
         )}

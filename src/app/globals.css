@@ -1,87 +1,111 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/*
+ * Locali design language: warm, light and photo-first.
+ * White canvas, near-black text for easy reading, one coral accent for actions.
+ * Rounded cards with soft shadows; one friendly typeface (Onest) with Cyrillic.
+ */
 :root {
-  --bg: #0b0b0f;
-  --surface: #14141b;
-  --surface-2: #1c1c25;
-  --line: rgba(255, 255, 255, 0.08);
-  --text: #f5f2ec;
-  --muted: #9b98a6;
-  --accent: #ff8a4c;
-  --accent-soft: rgba(255, 138, 76, 0.14);
-  --ai: #b6a4ff;
-  --ai-soft: rgba(182, 164, 255, 0.14);
-  --good: #6fdc9b;
+  --bg: #ffffff;
+  --canvas: #f6f5f3;
+  --surface: #ffffff;
+  --surface-2: #f3f2ef;
+  --line: #ebe9e5;
+  --line-strong: #d9d6d0;
+  --text: #1c1b1a;
+  --muted: #6b6862;
+  --accent: #f2543d;
+  --accent-ink: #ffffff;
+  --accent-soft: #ffeee9;
+  --open: #18884a;
+  --danger: #d23b2a;
 }
 
 @theme inline {
   --color-bg: var(--bg);
+  --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
-  --color-ai: var(--ai);
-  --color-good: var(--good);
-  --font-sans: var(--font-geist);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-open: var(--open);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-onest);
 }
 
 * { -webkit-tap-highlight-color: transparent; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+
 body {
-  background:
-    radial-gradient(900px 600px at 15% -10%, rgba(255, 138, 76, 0.16), transparent 60%),
-    radial-gradient(800px 600px at 110% 10%, rgba(182, 164, 255, 0.14), transparent 60%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   color: var(--text);
-  font-family: var(--font-geist), system-ui, sans-serif;
+  font-family: var(--font-onest), system-ui, sans-serif;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
 }
 
-.font-display { font-family: var(--font-serif), Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
+/* Headings: bold, slightly tight, sentence case. */
+.display { font-weight: 700; line-height: 1.06; letter-spacing: -0.025em; }
+.display-soft { font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+
+/* Small labels and metadata: readable size, no all-caps. */
+.mono { font-size: 13px; font-weight: 500; line-height: 1.35; }
+
+.card { background: var(--surface); border-radius: 20px; box-shadow: 0 1px 2px rgba(28, 27, 26, 0.05), 0 8px 24px rgba(28, 27, 26, 0.07); }
+
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
-.glass {
-  background: rgba(20, 20, 27, 0.72);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid var(--line);
-}
+.rise { animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-.orb {
-  background: conic-gradient(from 180deg, #ff8a4c, #ffb36b, #b6a4ff, #7c6cff, #ff8a4c);
-  box-shadow: 0 0 32px rgba(182, 164, 255, 0.45), 0 0 12px rgba(255, 138, 76, 0.35);
-}
-.orb-spin { animation: spin 6s linear infinite; }
-.orb-pulse { animation: pulse 1.6s ease-in-out infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes pulse { 50% { transform: scale(0.9); opacity: 0.75; } }
+.skeleton { background: var(--surface-2); animation: blink 1.2s ease-in-out infinite; border-radius: 12px; }
+@keyframes blink { 50% { opacity: 0.55; } }
 
-.fade-up { animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.dots::after { content: "…"; animation: caret 1s steps(1) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
 
-.shimmer {
-  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-}
-@keyframes shimmer { to { background-position: -200% 0; } }
-
-.text-gradient {
-  background: linear-gradient(90deg, #ffc48a, #ff8a4c 40%, #b6a4ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.sheet-in { animation: sheetIn 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+.sheet-in { animation: sheetIn 0.3s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
 @keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
 
-.maplibregl-ctrl-attrib { font-size: 9px; background: rgba(11, 11, 15, 0.6) !important; }
+
+
+.maplibregl-ctrl-attrib { font-size: 9px; background: rgba(255, 255, 255, 0.8) !important; }
 .maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+
+/* Concierge bell in the tab bar: rings every few seconds, sparkles twinkle around it. */
+.bell { transform-origin: 50% 12%; animation: ring 4.5s ease-in-out infinite; }
+@keyframes ring {
+  0%, 70%, 100% { transform: rotate(0); }
+  74% { transform: rotate(16deg); } 78% { transform: rotate(-14deg); } 82% { transform: rotate(10deg); }
+  86% { transform: rotate(-6deg); } 90% { transform: rotate(3deg); }
+}
+.twinkle { animation: twinkle 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.twinkle-2 { animation-delay: 0.8s; }
+.twinkle-3 { animation-delay: 1.6s; }
+@keyframes twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1); } }
+.halo { animation: halo 2.6s ease-out infinite; }
+@keyframes halo { 0% { transform: scale(0.85); opacity: 0.55; } 100% { transform: scale(1.45); opacity: 0; } }
+
+/* Lumi the concierge */
+.mascot { overflow: visible; }
+.mascot-body { transform-origin: 50% 90%; transform-box: fill-box; animation: bob 3.2s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-1.5px) rotate(-2deg); } }
+.mascot-blink { transform-origin: center; transform-box: fill-box; animation: blink-eyes 4s infinite; }
+@keyframes blink-eyes { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+.mascot-thinking .mascot-eyes { animation: look 1.6s ease-in-out infinite; }
+@keyframes look { 0%, 100% { transform: translateX(0); } 30% { transform: translateX(-2.5px); } 70% { transform: translateX(2.5px); } }
+.mascot-thinking .mascot-body { animation-duration: 1.2s; }
+.mascot-happy .mascot-body { animation: hop 0.6s ease-out 2; }
+@keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-5px) scale(1.04); } }
+.mascot-cap { transform-origin: 50% 100%; transform-box: fill-box; animation: tip 6s ease-in-out infinite; }
+@keyframes tip { 0%, 85%, 100% { transform: rotate(0); } 90% { transform: rotate(-12deg) translateY(-1px); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

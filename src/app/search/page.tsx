@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { useApp } from "@/components/app-provider";
 import { IconSearch } from "@/components/icons";
-import { PlaceRow, RowSkeleton } from "@/components/place-bits";
+import { PlaceRow, RowSkeleton, SectionTitle } from "@/components/place-bits";
 import { api } from "@/lib/client/api";
 import { CATEGORIES, type Place } from "@/lib/places/types";
 
@@ -28,7 +28,6 @@ function SearchInner() {
   const [results, setResults] = useState<Place[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [recent, setRecent] = useState<string[]>([]);
-  const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => setRecent(readRecent()), []);
 
@@ -62,25 +61,24 @@ function SearchInner() {
   }, [q, open, maxPrice, center, ready]);
 
   const chip = (active: boolean) =>
-    clsx("shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition", active ? "bg-accent text-black" : "border border-line bg-surface/60 text-text/80");
+    clsx("shrink-0 rounded-full px-3.5 py-2 text-[14px] font-medium transition", active ? "bg-text text-white" : "bg-canvas text-text hover:bg-surface-2");
 
   return (
-    <main className="pt-[max(env(safe-area-inset-top),20px)]">
-      <div className="sticky top-0 z-20 bg-bg/80 px-5 pb-3 pt-2 backdrop-blur-xl">
-        <h1 className="mb-3 font-display text-[40px] leading-none">Search</h1>
-        <label className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 focus-within:border-accent/50">
-          <IconSearch className="h-5 w-5 text-muted" />
+    <main className="px-4 pt-[max(env(safe-area-inset-top),14px)]">
+      <div className="sticky top-0 z-20 -mx-4 bg-bg px-4 pb-3 pt-2">
+        <h1 className="display text-[30px]">Search</h1>
+        <label className="mt-4 flex items-center gap-3 rounded-2xl border border-line bg-canvas px-4 py-3 focus-within:border-accent">
+          <IconSearch className="h-5 w-5 shrink-0 text-muted" />
           <input
-            ref={input}
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Ramen, rooftop, bakery…"
-            className="w-full bg-transparent text-[16px] outline-none placeholder:text-muted/70"
+            placeholder="Ramen, rooftop, bakery"
+            className="w-full bg-transparent text-[17px] outline-none placeholder:text-muted"
             enterKeyHint="search"
           />
           {q && (
-            <button onClick={() => setQ("")} className="text-sm text-muted">
+            <button onClick={() => setQ("")} className="mono text-muted hover:text-text">
               Clear
             </button>
           )}
@@ -89,51 +87,54 @@ function SearchInner() {
           <button className={chip(open)} onClick={() => setOpen(!open)}>
             Open now
           </button>
-          {mode !== "osm" && [1, 2, 3].map((n) => (
-            <button key={n} className={chip(maxPrice === n)} onClick={() => setMaxPrice(maxPrice === n ? undefined : n)}>
-              {"Up to " + "$".repeat(n)}
-            </button>
-          ))}
+          {mode !== "osm" &&
+            [1, 2, 3].map((n) => (
+              <button key={n} className={chip(maxPrice === n)} onClick={() => setMaxPrice(maxPrice === n ? undefined : n)}>
+                {"≤ " + "$".repeat(n)}
+              </button>
+            ))}
         </div>
       </div>
 
-      <div className="px-3">
-        {results === null && !loading && (
-          <div className="px-2 pt-4">
-            {recent.length > 0 && (
-              <>
-                <h2 className="text-[13px] font-semibold uppercase tracking-wider text-muted">Recent</h2>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {recent.map((r) => (
-                    <button key={r} onClick={() => setQ(r)} className="rounded-full border border-line px-3 py-1.5 text-sm">
+      {results === null && !loading && (
+        <div className="pt-4">
+          {recent.length > 0 && (
+            <section className="mb-8">
+              <SectionTitle>Recent</SectionTitle>
+              <ul>
+                {recent.map((r) => (
+                  <li key={r}>
+                    <button onClick={() => setQ(r)} className="flex w-full items-center justify-between border-b border-line py-3 text-left text-[16px] hover:text-accent">
                       {r}
+                      <span className="mono text-muted">↵</span>
                     </button>
-                  ))}
-                </div>
-              </>
-            )}
-            <h2 className="mt-7 text-[13px] font-semibold uppercase tracking-wider text-muted">Browse</h2>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {CATEGORIES.map((c) => (
-                <button key={c.key} onClick={() => setQ(c.query)} className="rounded-3xl border border-line bg-surface p-4 text-left transition hover:bg-surface-2">
-                  <div className="text-2xl">{c.emoji}</div>
-                  <div className="mt-6 font-display text-2xl">{c.label}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {loading && [0, 1, 2, 3].map((i) => <RowSkeleton key={i} />)}
-        {!loading && results?.length === 0 && <p className="px-2 pt-10 text-center text-muted">No places found. Try a broader word or remove filters.</p>}
-        {!loading && results && results.length > 0 && (
-          <>
-            <p className="px-2 pb-1 pt-2 text-[13px] text-muted">{results.length} places</p>
-            {results.map((p) => (
-              <PlaceRow key={p.id} place={p} center={center} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <SectionTitle>Browse</SectionTitle>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {CATEGORIES.map((c) => (
+              <button key={c.key} onClick={() => setQ(c.query)} className="group rounded-2xl bg-canvas p-4 text-left transition hover:bg-accent-soft">
+                <span className="text-2xl">{c.emoji}</span>
+                <span className="display mt-6 block text-[18px] group-hover:text-accent">{c.label}</span>
+              </button>
             ))}
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {loading && [0, 1, 2, 3].map((i) => <RowSkeleton key={i} />)}
+      {!loading && results?.length === 0 && <p className="pt-10 text-center text-muted">No places found. Try a broader word or remove filters.</p>}
+      {!loading && results && results.length > 0 && (
+        <>
+          <p className="pb-1 pt-3 text-[14px] text-muted">{results.length} places</p>
+          {results.map((p, i) => (
+            <PlaceRow key={p.id} place={p} center={center} index={i} />
+          ))}
+        </>
+      )}
     </main>
   );
 }

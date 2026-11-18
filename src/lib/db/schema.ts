@@ -68,6 +68,13 @@ export const pollVotes = pgTable(
   (t) => [primaryKey({ columns: [t.pollId, t.voterId] })],
 );
 
+/** Cover photo found on a venue's own website (og:image); url null = looked, nothing usable. */
+export const sitePhotos = pgTable("site_photos", {
+  placeId: text("place_id").primaryKey(),
+  url: text("url"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const conciergeRuns = pgTable(
   "concierge_runs",
   {

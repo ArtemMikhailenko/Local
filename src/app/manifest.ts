@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Find the right place nearby, or tell the concierge what kind of evening you want.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0b0b0f",
-    theme_color: "#0b0b0f",
+    background_color: "#ffffff",
+    theme_color: "#ffffff",
     orientation: "portrait",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

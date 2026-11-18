@@ -22,6 +22,13 @@
       "when": 1795011809584,
       "tag": "0002_polls",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795012691045,
+      "tag": "0003_site_photos",
+      "breakpoints": true
     }
   ]
 }

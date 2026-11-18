@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Instrument_Serif } from "next/font/google";
+import { Onest } from "next/font/google";
 import { AppProvider } from "@/components/app-provider";
 import { TabBar } from "@/components/tab-bar";
 import { AuthSheet } from "@/components/auth-sheet";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin", "cyrillic"], variable: "--font-geist" });
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"], variable: "--font-serif" });
+// Onest: friendly, very readable, with Cyrillic (many venue names are Ukrainian).
+const onest = Onest({ subsets: ["latin", "cyrillic"], variable: "--font-onest" });
 
 export const metadata: Metadata = {
   title: "Locali · your AI concierge",
@@ -14,14 +14,14 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Locali", statusBarStyle: "black-translucent" },
 };
 
-export const viewport: Viewport = { themeColor: "#0b0b0f", width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#ffffff", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${serif.variable}`}>
+    <html lang="en" className={`${onest.variable}`}>
       <body>
         <AppProvider>
-          <div className="mx-auto min-h-dvh max-w-[480px] pb-32 sm:border-x sm:border-line">{children}</div>
+          <div className="mx-auto min-h-dvh max-w-[480px] pb-28 sm:border-x sm:border-line">{children}</div>
           <TabBar />
           <AuthSheet />
         </AppProvider>

@@ -48,7 +48,9 @@ export function anthropicFactory(create: CreateFn, model: string): LlmFactory {
         });
       },
       addUserText(text) {
-        messages.push({ role: "user", content: text });
+        const last = messages[messages.length - 1];
+        if (last?.role === "user" && Array.isArray(last.content)) last.content = [...last.content, { type: "text", text }];
+        else messages.push({ role: "user", content: text });
       },
     };
   };

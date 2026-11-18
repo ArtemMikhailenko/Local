@@ -66,10 +66,10 @@ export function VoiceButton({ onText, onFinal, disabled }: { onText: (t: string)
       aria-label={listening ? "Stop listening" : "Speak your request"}
       className={clsx(
         "relative grid h-11 w-11 shrink-0 place-items-center rounded-full transition disabled:opacity-40",
-        listening ? "bg-red-500 text-white" : "bg-white/10 text-text hover:bg-white/15",
+        listening ? "bg-accent text-white" : "bg-surface-2 text-text hover:bg-line",
       )}
     >
-      {listening && <span className="absolute inset-0 animate-ping rounded-full bg-red-500/50" />}
+      {listening && <span className="absolute inset-0 animate-ping rounded-full bg-accent/40" />}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="relative h-5 w-5">
         <rect x="9" y="3" width="6" height="11" rx="3" />
         <path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" />

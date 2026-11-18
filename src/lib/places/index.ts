@@ -1,10 +1,11 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { LatLng } from "@/lib/geo";
 import { env, placesMode } from "@/lib/env";
 import { createOsmProvider, geoapifyTransport, overpassTransport, type FetchArea, type OsmVenue } from "./osm";
 import { createDemoProvider } from "./demo";
+import { fetchSitePhoto } from "./site-photo";
 import { createGoogleProvider } from "./google";
 import type { Place, PlacesProvider, SearchParams } from "./types";
 
@@ -44,17 +45,84 @@ function withDbCache(fetchArea: FetchArea): FetchArea {
   };
 }
 
+/**
+ * Real photos for OSM venues from their own website. Search results use what is already known
+ * (and look up the rest in the background); the place page waits for it.
+ */
+function withSitePhotos(inner: PlacesProvider): PlacesProvider {
+  const known = new Map<string, string | null>();
+  const pending = new Map<string, Promise<string | null>>();
+  let active = 0;
+
+  const apply = (p: Place): Place => {
+    const url = known.get(p.id);
+    return url ? { ...p, photos: [url, ...p.photos.slice(1)], photosIllustrative: false } : p;
+  };
+  const lookupOne = (p: Place): Promise<string | null> => {
+    if (known.has(p.id)) return Promise.resolve(known.get(p.id)!);
+    if (pending.has(p.id)) return pending.get(p.id)!;
+    const job = (async () => {
+      active++;
+      try {
+        const url = p.website ? await fetchSitePhoto(p.website) : null;
+        known.set(p.id, url);
+        await db.insert(schema.sitePhotos).values({ placeId: p.id, url }).onConflictDoUpdate({ target: schema.sitePhotos.placeId, set: { url, fetchedAt: new Date() } }).catch(() => {});
+        return url;
+      } finally {
+        active--;
+        pending.delete(p.id);
+      }
+    })();
+    pending.set(p.id, job);
+    return job;
+  };
+  const queue: Place[] = [];
+  const pump = () => {
+    while (active < 4 && queue.length) {
+      const next = queue.shift()!;
+      if (!known.has(next.id)) lookupOne(next).catch(() => {}).finally(pump);
+    }
+  };
+  const loadKnown = async (ids: string[]) => {
+    const missing = ids.filter((id) => !known.has(id));
+    if (!missing.length) return;
+    try {
+      const rows = await db.select().from(schema.sitePhotos).where(inArray(schema.sitePhotos.placeId, missing));
+      rows.forEach((r) => known.set(r.placeId, r.url));
+    } catch {}
+  };
+
+  return {
+    async search(params) {
+      const results = await inner.search(params);
+      const withSite = results.filter((p) => p.website);
+      await loadKnown(withSite.map((p) => p.id));
+      // Queue background lookups (4 at a time) so the next view has real photos.
+      for (const p of withSite) if (!known.has(p.id) && !pending.has(p.id) && !queue.some((q) => q.id === p.id)) queue.push(p);
+      pump();
+      return results.map(apply);
+    },
+    async details(id) {
+      const p = await inner.details(id);
+      if (!p?.website) return p;
+      await loadKnown([p.id]);
+      await lookupOne(p).catch(() => null);
+      return apply(p);
+    },
+  };
+}
+
 const g = globalThis as unknown as { placesProvider?: PlacesProvider };
 function build(): PlacesProvider {
   const mode = placesMode();
   if (mode === "demo") return createDemoProvider();
   if (mode === "google") return cached(createGoogleProvider(env.googlePlacesKey));
   const overpass = overpassTransport();
-  return createOsmProvider({
+  return withSitePhotos(createOsmProvider({
     area: withDbCache(env.geoapifyKey ? geoapifyTransport(env.geoapifyKey).area : overpass.area),
     one: overpass.one,
     timeZone: env.timeZone,
-  });
+  }));
 }
 
 export const places: PlacesProvider = g.placesProvider ?? (g.placesProvider = build());

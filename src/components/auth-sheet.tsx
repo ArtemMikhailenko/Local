@@ -28,26 +28,32 @@ export function AuthSheet() {
     }
   }
 
-  const field = "w-full rounded-2xl border border-line bg-surface-2 px-4 py-3.5 text-[15px] outline-none transition placeholder:text-muted/70 focus:border-accent/60";
+  const field = "mt-3 w-full rounded-xl border border-line bg-canvas px-4 py-3.5 text-[16px] outline-none transition placeholder:text-muted focus:border-accent";
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={closeAuth}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={closeAuth}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
-        className="sheet-in w-full max-w-[480px] rounded-t-[32px] border-t border-line bg-surface px-6 pb-[max(env(safe-area-inset-bottom),24px)] pt-3"
+        className="sheet-in w-full max-w-[480px] rounded-t-[28px] bg-surface px-5 pb-[max(env(safe-area-inset-bottom),20px)] pt-5"
       >
-        <div className="mx-auto mb-5 h-1.5 w-10 rounded-full bg-white/15" />
-        <h2 className="font-display text-[34px] leading-none">{tab === "signup" ? "Make it yours" : "Welcome back"}</h2>
-        <p className="mt-2 text-sm text-muted">Save places and let the concierge learn your taste. Your list is private to your account.</p>
-        <div className="mt-5 grid grid-cols-2 rounded-2xl bg-surface-2 p-1 text-sm">
+        <div className="flex justify-between text-[14px] text-muted">
+          <span>Account</span>
+          <button type="button" onClick={closeAuth} className="hover:text-text">
+            Close ✕
+          </button>
+        </div>
+        <h2 className="display mt-4 text-[30px]">{tab === "signup" ? "Keep your places." : "Welcome back."}</h2>
+        <p className="mt-2 text-[14px] text-muted">Saved places and notes are private to your account. The concierge uses them to learn your taste.</p>
+        <div className="mt-5 flex gap-5 border-b border-line">
           {(["signup", "login"] as const).map((t) => (
-            <button type="button" key={t} onClick={() => setTab(t)} className={clsx("rounded-xl py-2.5 font-medium transition", tab === t ? "bg-white/10 text-text" : "text-muted")}>
+            <button type="button" key={t} onClick={() => setTab(t)} className={clsx("relative pb-2.5 text-[15px] font-medium", tab === t ? "text-text" : "text-muted")}>
               {t === "signup" ? "Create account" : "Sign in"}
+              {tab === t && <span className="absolute inset-x-0 -bottom-px h-[2px] bg-accent" />}
             </button>
           ))}
         </div>
-        <div className="mt-4 space-y-3">
-          {tab === "signup" && <input className={field} placeholder="Your name" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
+        <div className="mt-2">
+          {tab === "signup" && <input className={field} placeholder="Name" autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />}
           <input className={field} type="email" placeholder="Email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           <input
             className={field}
@@ -60,12 +66,10 @@ export function AuthSheet() {
             required
           />
         </div>
-        {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
-        <button disabled={busy} className="mt-5 w-full rounded-2xl bg-accent py-4 font-semibold text-black transition active:scale-[0.99] disabled:opacity-60">
-          {busy ? "One moment…" : tab === "signup" ? "Create account" : "Sign in"}
-        </button>
-        <button type="button" onClick={closeAuth} className="mt-2 w-full py-3 text-sm text-muted">
-          Not now
+        {error && <p className="mt-3 text-[14px] text-danger">{error}</p>}
+        <button disabled={busy} className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-accent text-[16px] font-semibold text-accent-ink disabled:opacity-60">
+          {busy ? "One moment" : tab === "signup" ? "Create account" : "Sign in"}
+          <span>→</span>
         </button>
       </form>
     </div>

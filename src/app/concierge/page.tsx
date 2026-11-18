@@ -3,14 +3,14 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import clsx from "clsx";
 import { useApp } from "@/components/app-provider";
-import { IconRoute, IconSearch, IconSend, IconSparkle, IconShare } from "@/components/icons";
+import { Mascot } from "@/components/mascot";
+import { IconArrow, IconRoute, IconShare } from "@/components/icons";
 import { PlanTimeline } from "@/components/plan-timeline";
 import { VoiceButton } from "@/components/voice-button";
 import { VotePanel, createPoll, sharePoll } from "@/components/vote-panel";
 import { walkingRouteUrl } from "@/lib/route";
-import { OpenBadge, Photo, Rating, SaveButton, Walk, priceLabel } from "@/components/place-bits";
+import { IllustrativeTag, Meta, Photo, SaveButton } from "@/components/place-bits";
 import type { ConciergeEvent } from "@/lib/concierge/agent";
 
 type Step = { kind: "status" | "search" | "inspect"; text: string };
@@ -28,9 +28,9 @@ const SUGGESTIONS = [
 ];
 
 function stepFrom(e: ConciergeEvent): Step | null {
-  if (e.t === "status") return { kind: "status", text: e.text };
-  if (e.t === "search") return { kind: "search", text: `Searched “${e.query}” · ${e.count} found` };
-  if (e.t === "inspect") return { kind: "inspect", text: `Checking ${e.name}` };
+  if (e.t === "status") return { kind: "status", text: e.text.toLowerCase() };
+  if (e.t === "search") return { kind: "search", text: `search “${e.query}” → ${e.count} found` };
+  if (e.t === "inspect") return { kind: "inspect", text: `check ${e.name}` };
   return null;
 }
 
@@ -116,147 +116,131 @@ function ConciergeInner() {
   }
 
   return (
-    <main className="flex min-h-[calc(100dvh-8rem)] flex-col pt-[max(env(safe-area-inset-top),20px)]">
-      <header className="flex items-center gap-3 px-5">
-        <span className={clsx("orb h-9 w-9 rounded-full", busy ? "orb-spin" : "")} />
+    <main className="flex min-h-[calc(100dvh-7rem)] flex-col px-4 pt-[max(env(safe-area-inset-top),14px)]">
+      <header className="flex items-center gap-3">
+        <Mascot className="h-12 w-12" mood={busy ? "thinking" : turns.some((t) => t.result || t.plan) ? "happy" : "idle"} />
         <div>
-          <div className="font-semibold leading-tight">Locali Concierge</div>
-          <div className="text-[12px] text-muted">{busy ? "Looking around for you…" : "Knows every street nearby"}</div>
+          <div className="text-[16px] font-semibold leading-tight">Lumi · concierge</div>
+          <div className="text-[13px] text-muted">{busy ? "Looking around for you…" : "Knows the neighbourhood"}</div>
         </div>
       </header>
 
       {pollParam && turns.length === 0 ? (
-        <section className="flex-1 px-4 py-6">
+        <section className="flex-1 py-6">
           <VotePanel pollId={pollParam} />
-          <p className="mt-6 text-center text-[13px] text-muted">Want ideas of your own? Ask the concierge below.</p>
+          <p className="mt-6 text-center text-[14px] text-muted">Want ideas of your own? Ask below.</p>
         </section>
       ) : turns.length === 0 ? (
-        <section className="fade-up flex flex-1 flex-col justify-center px-5 pb-4 pt-6">
-          <div className="orb orb-spin mx-auto h-16 w-16 rounded-full opacity-90 blur-[1px]" />
-          <h1 className="mt-6 text-center font-display text-[40px] leading-[1]">
-            Tell me the <span className="italic text-gradient">vibe</span>,<br />I&apos;ll find the place.
+        <section className="rise flex-1 pb-4 pt-8">
+          <Mascot className="mb-4 h-24 w-24" />
+          <h1 className="display text-[34px]">
+            Tell me what you&apos;re in the mood for
           </h1>
-          <p className="mx-auto mt-3 max-w-[300px] text-center text-[14px] text-muted">Who you&apos;re with, budget, mood, time. I check what&apos;s open and nearby, then pick three.</p>
-          <div className="mt-6 space-y-2 pb-4">
+          <p className="mt-4 max-w-[310px] text-[15px] leading-relaxed text-muted">Who you&apos;re with, budget, mood, how long. I check what&apos;s open and walkable, then pick three, or plan the whole evening.</p>
+          <div className="mt-7 space-y-2">
             {SUGGESTIONS.map((s, i) => (
               <button
                 key={s}
                 onClick={() => ask(s)}
-                style={{ animationDelay: `${i * 60}ms` }}
-                className="fade-up flex w-full items-center gap-3 rounded-2xl border border-line bg-surface/70 px-4 py-3 text-left text-[14px] transition hover:border-ai/30 hover:bg-surface-2"
+                style={{ animationDelay: `${i * 50}ms` }}
+                className="rise flex w-full items-center gap-3 rounded-2xl bg-canvas px-4 py-3.5 text-left text-[15px] transition hover:bg-accent-soft"
               >
-                <IconSparkle className="h-4 w-4 shrink-0 text-ai" />
-                {s}
+                <span className="flex-1 leading-snug">{s}</span>
+                <span className="text-muted">→</span>
               </button>
             ))}
           </div>
         </section>
       ) : (
-        <section className="flex-1 space-y-8 px-4 py-6">
+        <section className="flex-1 space-y-10 py-6">
           {turns.map((t) => (
             <div key={t.id} className="space-y-4">
-              <div className="ml-auto w-fit max-w-[85%] rounded-[22px] rounded-br-md bg-accent px-4 py-2.5 text-[15px] text-black">{t.prompt}</div>
+              <div className="ml-auto w-fit max-w-[85%] rounded-[20px] rounded-br-md bg-accent px-4 py-2.5 text-[15px] text-accent-ink">{t.prompt}</div>
 
               {((!t.result && !t.plan) || !t.done) && !t.error && (
-                <ol className="space-y-2 pl-1">
+                <ol className="space-y-2 text-[14px]">
                   {t.steps.map((s, i) => (
-                    <li key={i} className="fade-up flex items-center gap-2.5 text-[13px] text-muted">
-                      <span className={clsx("grid h-5 w-5 place-items-center rounded-full", s.kind === "search" ? "bg-ai/15 text-ai" : "bg-white/5")}>
-                        {s.kind === "search" ? <IconSearch className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                      </span>
+                    <li key={i} className="rise flex items-center gap-2 text-muted">
+                      <span className="h-1.5 w-1.5 rounded-full bg-open" />
                       {s.text}
                     </li>
                   ))}
                   {!t.done && (
-                    <li className="flex items-center gap-2.5 text-[13px] text-ai">
-                      <span className="orb orb-pulse h-5 w-5 rounded-full" />
-                      Thinking…
+                    <li className="flex items-center gap-2 font-medium text-accent">
+                      <Mascot className="h-7 w-7" mood="thinking" />
+                      <span className="dots">Lumi is looking around</span>
                     </li>
                   )}
                 </ol>
               )}
 
-              {t.error && <div className="rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-[14px] text-red-200">{t.error}</div>}
+              {t.error && <div className="rounded-2xl bg-[#fdecea] px-4 py-3 text-[15px] text-danger">{t.error}</div>}
 
               {t.plan && <PlanTimeline plan={t.plan} center={center} />}
 
               {t.result && (
-                <div className="space-y-3">
-                  <p className="fade-up flex gap-2 text-[15px] leading-relaxed">
-                    <IconSparkle className="mt-1 h-4 w-4 shrink-0 text-ai" />
-                    {t.result.intro}
-                  </p>
+                <div className="space-y-5">
+                  <p className="rise text-[16px] leading-relaxed">{t.result.intro}</p>
                   {t.result.picks.map((p, i) => (
-                    <Link
-                      key={p.place_id}
-                      href={`/place/${p.place.id}`}
-                      style={{ animationDelay: `${i * 120}ms` }}
-                      className="fade-up block overflow-hidden rounded-[26px] border border-line bg-surface transition active:scale-[0.99]"
-                    >
+                    <Link key={p.place_id} href={`/place/${p.place.id}`} style={{ animationDelay: `${i * 120}ms` }} className="card rise block overflow-hidden">
                       <div className="relative">
-                        <Photo src={p.place.photos[0]} alt={p.place.name} className="h-[180px] w-full" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/10 to-transparent" />
-                        <span className="absolute left-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md">#{i + 1}</span>
+                        <Photo src={p.place.photos[0]} alt={p.place.name} className="aspect-[16/10] w-full" />
+                        <span className="absolute left-3 top-3 grid h-7 w-7 place-items-center rounded-full bg-white text-[13px] font-bold shadow-sm">{i + 1}</span>
                         <SaveButton placeId={p.place.id} className="absolute right-3 top-3" />
-                        <div className="absolute inset-x-0 bottom-0 px-4">
-                          <div className="text-[12px] font-medium text-ai">{p.headline}</div>
-                          <h3 className="font-display text-[30px] leading-[1.02]">{p.place.name}</h3>
-                        </div>
+                        {p.place.photosIllustrative && <IllustrativeTag className="absolute bottom-3 left-3" />}
                       </div>
-                      <div className="px-4 pb-4 pt-2">
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <Rating place={p.place} />
-                          <Walk from={center} to={p.place.location} />
-                          <OpenBadge open={p.place.openNow} />
-                          {p.place.priceLevel ? <span className="text-[12px] text-muted">{priceLabel(p.place.priceLevel)}</span> : null}
-                        </div>
-                        <p className="mt-2.5 text-[14px] leading-relaxed text-text/85">{p.why}</p>
-                        {p.tip && (
-                          <p className="mt-2.5 rounded-xl bg-accent/10 px-3 py-2 text-[13px] text-accent">
-                            <span className="font-semibold">Tip:</span> {p.tip}
-                          </p>
-                        )}
+                      <div className="p-4">
+                        <div className="text-[13px] font-semibold text-accent">{p.headline}</div>
+                        <h3 className="display mt-1 text-[22px]">{p.place.name}</h3>
+                        <Meta place={p.place} center={center} className="mt-1.5" />
+                        <p className="mt-3 text-[15px] leading-relaxed text-text/85">{p.why}</p>
+                        {p.tip && <p className="mt-3 rounded-xl bg-canvas px-3 py-2 text-[14px] text-text/80">💡 {p.tip}</p>}
                       </div>
                     </Link>
                   ))}
                   {t.done && t.result.picks.length > 1 && (
-                    <a
-                      href={walkingRouteUrl(center, t.result.picks.map((p) => p.place)) ?? "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-center gap-2 rounded-2xl bg-accent py-3 text-[14px] font-semibold text-black"
-                    >
-                      <IconRoute />
-                      Walk them all as one evening
-                    </a>
-                  )}
-                  {t.done && t.result.picks.length > 1 && !t.pollId && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          const pid = await createPoll(t.prompt.slice(0, 80), t.result!.picks.map((p) => p.place.id));
-                          update(t.id, (x) => ({ ...x, pollId: pid }));
-                          sharePoll(pid, t.prompt.slice(0, 80), toast);
-                        } catch {
-                          toast("Could not start a vote");
-                        }
-                      }}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl border border-ai/30 bg-ai/10 py-3 text-[14px] font-semibold text-ai"
-                    >
-                      <IconShare className="h-4 w-4" />
-                      Can&apos;t decide? Let friends vote
-                    </button>
-                  )}
-                  {t.pollId && <VotePanel pollId={t.pollId} />}
-                  {t.done && (
-                    <div className="no-scrollbar flex gap-2 overflow-x-auto pt-1">
-                      {["Cheaper options", "Somewhere quieter", "Closer to me", "Something more unusual"].map((r) => (
-                        <button key={r} disabled={busy} onClick={() => ask(r)} className="shrink-0 rounded-full border border-ai/25 bg-ai/10 px-3 py-1.5 text-[13px] text-ai disabled:opacity-50">
-                          {r}
+                    <div className="grid grid-cols-2 gap-2">
+                      <a
+                        href={walkingRouteUrl(center, t.result.picks.map((p) => p.place)) ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex h-11 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-semibold text-accent-ink"
+                      >
+                        <IconRoute />
+                        Walk all
+                      </a>
+                      {!t.pollId ? (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const pid = await createPoll(t.prompt.slice(0, 80), t.result!.picks.map((p) => p.place.id));
+                              update(t.id, (x) => ({ ...x, pollId: pid }));
+                              sharePoll(pid, t.prompt.slice(0, 80), toast);
+                            } catch {
+                              toast("Could not start a vote");
+                            }
+                          }}
+                          className="flex h-11 items-center justify-center gap-2 rounded-full bg-surface-2 text-[15px] font-semibold"
+                        >
+                          <IconShare className="h-4 w-4" />
+                          Friends vote
                         </button>
-                      ))}
+                      ) : (
+                        <span className="flex h-11 items-center justify-center rounded-full bg-accent-soft text-[14px] font-medium text-accent">Vote is live ↓</span>
+                      )}
                     </div>
                   )}
+                  {t.pollId && <VotePanel pollId={t.pollId} />}
+                </div>
+              )}
+
+              {t.done && (t.result || t.plan) && (
+                <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+                  {["Cheaper", "Quieter", "Closer", "More unusual", "Make it a plan"].map((r) => (
+                    <button key={r} disabled={busy} onClick={() => ask(r === "Make it a plan" ? "Turn this into a timed plan for the evening" : `${r} options`)} className="shrink-0 rounded-full border border-line px-3.5 py-2 text-[14px] hover:border-accent hover:text-accent disabled:opacity-40">
+                      {r}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -270,9 +254,9 @@ function ConciergeInner() {
           e.preventDefault();
           ask(input);
         }}
-        className="sticky bottom-28 z-30 mx-4 mt-2"
+        className="sticky bottom-[78px] z-30 mt-2 pb-2"
       >
-        <div className="glass flex items-end gap-2 rounded-[26px] p-2 pl-4 shadow-2xl shadow-black/40">
+        <div className="card flex items-end gap-2 !rounded-[26px] p-1.5 pl-4">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -284,12 +268,12 @@ function ConciergeInner() {
             }}
             rows={1}
             maxLength={500}
-            placeholder={turns.length ? "Refine, or ask something new…" : "Dinner with my parents, they love fish…"}
-            className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-[15px] outline-none placeholder:text-muted/70"
+            placeholder={turns.length ? "Refine, or ask something new" : "Dinner with my parents, they love fish"}
+            className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent py-2.5 text-[16px] outline-none placeholder:text-muted"
           />
           <VoiceButton disabled={busy} onText={setInput} onFinal={(t) => ask(t)} />
-          <button disabled={busy || input.trim().length < 3} aria-label="Send" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-black transition disabled:bg-white/10 disabled:text-muted">
-            <IconSend />
+          <button disabled={busy || input.trim().length < 3} aria-label="Send" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition disabled:bg-surface-2 disabled:text-muted">
+            <IconArrow />
           </button>
         </div>
       </form>

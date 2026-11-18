@@ -168,6 +168,7 @@ export function buildUserMessage(input: ConciergeInput): string {
 export async function runConcierge(input: ConciergeInput, deps: ConciergeDeps): Promise<Picks | null> {
   const { llm, places, emit, maxTurns = 6, signal } = deps;
   const seen = new Map<string, Place>();
+  const searched = new Set<string>();
   const session = llm({ system: SYSTEM_PROMPT, tools: TOOLS, userMessage: buildUserMessage(input), signal });
   emit({ t: "status", text: "Reading your request" });
 
@@ -189,10 +190,14 @@ export async function runConcierge(input: ConciergeInput, deps: ConciergeDeps): 
     const results: ToolResult[] = await Promise.all(
       toolCalls.map(async (call, i) => {
         // Cost guard: a single turn may not fan out into unlimited API calls.
-        const out =
-          i < MAX_TOOL_USES_PER_TURN
-            ? await executeTool(call, input.center, places, seen, emit, deps)
-            : { content: `Skipped: at most ${MAX_TOOL_USES_PER_TURN} tool calls per turn.`, isError: true };
+        const searchKey = call.name === "search_places" ? JSON.stringify(call.input) : null;
+        let out: Awaited<ReturnType<typeof executeTool>>;
+        if (i >= MAX_TOOL_USES_PER_TURN) out = { content: `Skipped: at most ${MAX_TOOL_USES_PER_TURN} tool calls per turn.`, isError: true };
+        else if (searchKey && searched.has(searchKey)) out = { content: "You already ran this exact search; use those results or try a different angle.", isError: true };
+        else {
+          if (searchKey) searched.add(searchKey);
+          out = await executeTool(call, input.center, places, seen, emit, deps);
+        }
         if (out.final) final = out.final;
         if (out.plan) plan = out.plan;
         return { id: call.id, name: call.name, content: out.content, isError: out.isError };
@@ -218,6 +223,8 @@ export async function runConcierge(input: ConciergeInput, deps: ConciergeDeps): 
     }
     // Promise.all keeps call order, so results line up with the calls.
     session.addToolResults(results);
+    // Keep runs short: after a couple of research rounds, ask for the answer.
+    if (turn === maxTurns - 3) session.addUserText("You have enough information now. Choose and call present_picks (or present_plan) in your next reply.");
   }
   emit({ t: "error", message: "The concierge took too long. Try a more specific request." });
   return null;

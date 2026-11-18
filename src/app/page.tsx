@@ -1,34 +1,65 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import { useApp } from "@/components/app-provider";
-import { IconDice, IconPin, IconSparkle } from "@/components/icons";
+import { Mascot } from "@/components/mascot";
+import { IconDice, IconPin } from "@/components/icons";
 import { MapView } from "@/components/map-view";
-import { Photo, PlaceCard, PlaceRow, RowSkeleton } from "@/components/place-bits";
-import { readViewed, haptic, type RecentItem } from "@/lib/client/extras";
-import type { Weather } from "@/lib/weather";
+import { Photo, PlaceCard, PlaceRow, RowSkeleton, SectionTitle } from "@/components/place-bits";
 import { api } from "@/lib/client/api";
+import { haptic, readViewed, type RecentItem } from "@/lib/client/extras";
 import { CATEGORIES, type Place } from "@/lib/places/types";
+import type { Weather } from "@/lib/weather";
 
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 5) return "Late night";
+const PROMPTS = ["Romantic dinner, not too pricey", "Rainy day with kids", "Laptop-friendly coffee", "Plan our evening, 4 people"];
+
+function greeting(h: number) {
+  if (h < 5) return "Good night";
   if (h < 12) return "Good morning";
   if (h < 18) return "Good afternoon";
   return "Good evening";
 }
 
-const PROMPTS = ["Romantic dinner, not too pricey", "Rainy day with kids", "Laptop-friendly coffee", "Sunset drinks for 4"];
+function useClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
 
 export default function Discover() {
   const { user, center, locationLabel, mode, ready } = useApp();
+  const router = useRouter();
+  const now = useClock();
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>(CATEGORIES[2]);
   const [list, setList] = useState<Place[] | null>(null);
   const [viewed, setViewed] = useState<RecentItem[]>([]);
   const [weather, setWeather] = useState<Weather | null>(null);
+  const [rolling, setRolling] = useState(false);
+  // The map can wander away from the list: venues for whatever area the user drags to.
+  const [mapPlaces, setMapPlaces] = useState<Place[] | null>(null);
+  const [mapLoading, setMapLoading] = useState(false);
+  const mapReq = useRef(0);
+
+  async function loadArea(c: { lat: number; lng: number }) {
+    const req = ++mapReq.current;
+    setMapLoading(true);
+    try {
+      const { results } = await api.search(cat.query, c.lat, c.lng);
+      if (req === mapReq.current) setMapPlaces(results.slice(0, 20));
+    } catch {
+    } finally {
+      if (req === mapReq.current) setMapLoading(false);
+    }
+  }
+
+  useEffect(() => setViewed(readViewed()), []);
 
   useEffect(() => {
     if (!ready) return;
@@ -37,30 +68,12 @@ export default function Discover() {
       .then((d) => setWeather(d.weather))
       .catch(() => {});
   }, [center, ready]);
-  const [rolling, setRolling] = useState(false);
-  const router = useRouter();
-
-  useEffect(() => setViewed(readViewed()), []);
-
-  /** "Surprise me": a random well-rated place that is open right now, from a random category. */
-  async function surprise() {
-    setRolling(true);
-    haptic(20);
-    try {
-      const c = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
-      const { results } = await api.search(c.query, center.lat, center.lng, { open: true });
-      const good = results.filter((p) => (p.rating ?? 0) >= 4.4);
-      const pool = good.length ? good : results;
-      if (pool.length) router.push(`/place/${pool[Math.floor(Math.random() * pool.length)].id}`);
-    } finally {
-      setRolling(false);
-    }
-  }
 
   useEffect(() => {
     if (!ready) return;
     let alive = true;
     setList(null);
+    setMapPlaces(null);
     api
       .search(cat.query, center.lat, center.lng)
       .then((r) => alive && setList(r.results))
@@ -70,83 +83,87 @@ export default function Discover() {
     };
   }, [cat, center, ready]);
 
-  const top = list?.slice(0, 5) ?? [];
-  const rest = list?.slice(5, 11) ?? [];
+  /** "Surprise me": a random place that is open right now, from a random category. */
+  async function surprise() {
+    setRolling(true);
+    haptic(20);
+    try {
+      const c = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+      const { results } = await api.search(c.query, center.lat, center.lng, { open: true });
+      const good = results.filter((p) => (p.rating ?? 5) >= 4.4);
+      const pool = good.length ? good : results;
+      if (pool.length) router.push(`/place/${pool[Math.floor(Math.random() * pool.length)].id}`);
+    } finally {
+      setRolling(false);
+    }
+  }
+
+  const time = now?.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const evening = now ? now.getHours() >= 17 || now.getHours() < 4 : true;
+  const weatherPrompt = weather?.isRainy || weather?.isCold ? "Somewhere cozy indoors, close by" : weather?.isNice ? "A good terrace for a drink" : "Something good nearby right now";
 
   return (
-    <main className="pt-[max(env(safe-area-inset-top),20px)]">
-      <header className="flex items-center justify-between px-5">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1.5 text-[13px]">
-          <IconPin className="h-3.5 w-3.5 text-accent" />
+    <main className="px-4 pt-[max(env(safe-area-inset-top),16px)]">
+      <header className="flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-[14px] font-medium">
+          <IconPin className="h-4 w-4 text-accent" />
           {locationLabel}
-          {mode === "demo" && <span className="ml-1 rounded-full bg-ai/15 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-ai">demo</span>}
+          {mode === "demo" && <span className="text-muted">· demo</span>}
+        </span>
+        <div className="flex items-center gap-2">
+          {weather && (
+            <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1.5 text-[14px] font-medium">
+              <span>{weather.emoji}</span>
+              {weather.tempC}°
+            </Link>
+          )}
+          <Link href="/saved" aria-label="Profile" className="grid h-9 w-9 place-items-center rounded-full bg-text text-[14px] font-semibold text-white">
+            {user ? user.name[0]?.toUpperCase() : "?"}
+          </Link>
         </div>
-        <Link href="/saved" className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 text-sm font-semibold">
-          {user ? user.name[0]?.toUpperCase() : "·"}
-        </Link>
       </header>
 
-      <section className="fade-up px-5 pt-7">
-        {weather && (
-          <Link
-            href={`/concierge?q=${encodeURIComponent(weather.isRainy || weather.isCold ? "Somewhere cozy indoors, close by" : weather.isNice ? "A nice terrace for a drink" : "Something good nearby right now")}`}
-            className="mb-3 inline-flex items-center gap-2 rounded-full bg-surface/70 py-1 pl-1.5 pr-3 text-[13px]"
-          >
-            <span className="text-base">{weather.emoji}</span>
-            <span className="font-medium">{weather.tempC}°</span>
-            <span className="text-muted">
-              {weather.label}
-              {weather.isRainy || weather.isCold ? " · cozy indoor picks →" : weather.isNice ? " · terrace weather →" : ""}
+      <section className="rise pt-7">
+        <p className="text-[15px] text-muted">
+          {now ? greeting(now.getHours()) : "Hello"}
+          {user ? `, ${user.name.split(" ")[0]}` : ""}
+          {time ? ` · ${time}` : ""}
+        </p>
+        <h1 className="display mt-1 text-[38px]">Where to {evening ? "tonight" : "today"}?</h1>
+      </section>
+
+      {/* Concierge entry: a friendly search-like box */}
+      <section className="mt-5">
+        <Link href="/concierge" className="card flex items-center gap-3 p-4 transition active:scale-[0.99]">
+          <Mascot className="h-14 w-14 shrink-0" />
+          <span className="min-w-0">
+            <span className="block text-[16px] font-semibold">Ask Lumi, your concierge</span>
+            <span className="block truncate text-[14px] text-muted">“Dinner for two, quiet, not too far”</span>
+          </span>
+        </Link>
+        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+          {PROMPTS.map((p) => (
+            <Link key={p} href={`/concierge?q=${encodeURIComponent(p)}`} className="shrink-0 rounded-full border border-line px-3.5 py-2 text-[14px] transition hover:border-accent hover:text-accent">
+              {p}
+            </Link>
+          ))}
+        </div>
+        {weather && (weather.isRainy || weather.isCold || weather.isNice) && (
+          <Link href={`/concierge?q=${encodeURIComponent(weatherPrompt)}`} className="mt-3 flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 text-[14px] text-text">
+            <span className="text-lg">{weather.emoji}</span>
+            <span>
+              {weather.label}, {weather.tempC}°. {weather.isNice ? "Great evening for a terrace." : "Cozy indoor places nearby →"}
             </span>
           </Link>
         )}
-        <p className="text-sm text-muted">
-          {greeting()}
-          {user ? `, ${user.name.split(" ")[0]}` : ""}
-        </p>
-        <h1 className="mt-1 font-display text-[44px] leading-[0.98]">
-          Where to <span className="italic text-gradient">tonight?</span>
-        </h1>
-        <button
-          onClick={surprise}
-          disabled={rolling}
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-4 py-2 text-sm font-medium transition hover:bg-surface-2 active:scale-95 disabled:opacity-60"
-        >
-          <IconDice className={rolling ? "h-4 w-4 animate-spin text-accent" : "h-4 w-4 text-accent"} />
-          {rolling ? "Rolling…" : "Surprise me, something open now"}
-        </button>
       </section>
 
-      <section className="px-5 pt-5">
-        <div className="group relative overflow-hidden rounded-[28px] border border-line bg-surface p-5">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-ai/25 blur-3xl transition group-hover:bg-ai/35" />
-          <Link href="/concierge" className="flex items-center gap-3">
-            <span className="orb orb-spin h-9 w-9 rounded-full" />
-            <div>
-              <div className="font-semibold">Ask the concierge</div>
-              <div className="text-[13px] text-muted">Describe the vibe, get 3 hand-picked places</div>
-            </div>
-          </Link>
-          <div className="no-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5">
-            {PROMPTS.map((p) => (
-              <Link key={p} href={`/concierge?q=${encodeURIComponent(p)}`} className="shrink-0 rounded-full border border-ai/25 bg-ai/10 px-3 py-1.5 text-[13px] text-ai transition hover:bg-ai/20">
-                <IconSparkle className="mr-1 inline h-3 w-3" />
-                {p}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <nav className="no-scrollbar mt-6 flex gap-2 overflow-x-auto px-5">
+      <nav className="no-scrollbar -mx-4 mt-7 flex gap-2 overflow-x-auto px-4">
         {CATEGORIES.map((c) => (
           <button
             key={c.key}
             onClick={() => setCat(c)}
-            className={clsx(
-              "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition",
-              c.key === cat.key ? "bg-text text-black" : "border border-line bg-surface/60 text-text/80 hover:bg-surface-2",
-            )}
+            className={clsx("shrink-0 rounded-full px-4 py-2 text-[14px] font-medium transition", c.key === cat.key ? "bg-text text-white" : "bg-canvas text-text hover:bg-surface-2")}
           >
             <span className="mr-1.5">{c.emoji}</span>
             {c.label}
@@ -154,49 +171,62 @@ export default function Discover() {
         ))}
       </nav>
 
-      <section className="mt-5">
-        <div className="flex items-baseline justify-between px-5">
-          <h2 className="font-display text-[28px]">Top {cat.label.toLowerCase()} nearby</h2>
-          <Link href={`/search?q=${encodeURIComponent(cat.query)}`} className="text-sm text-muted hover:text-text">
-            See all
-          </Link>
-        </div>
-        <div className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-1">
+      <section className="mt-6">
+        <SectionTitle
+          action={
+            <Link href={`/search?q=${encodeURIComponent(cat.query)}`} className="text-[14px] font-semibold text-accent">
+              See all
+            </Link>
+          }
+        >
+          Top {cat.label.toLowerCase()} nearby
+        </SectionTitle>
+        <div className="no-scrollbar -mx-4 mt-3 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 px-4 pb-2">
           {list === null
-            ? [0, 1].map((i) => <div key={i} className="shimmer h-[300px] w-[260px] shrink-0 rounded-[26px]" />)
-            : top.map((p) => <PlaceCard key={p.id} place={p} center={center} />)}
+            ? [0, 1].map((i) => <div key={i} className="skeleton aspect-[4/5] w-[250px] shrink-0 !rounded-[20px]" />)
+            : list.slice(0, 6).map((p) => <PlaceCard key={p.id} place={p} center={center} />)}
           {list?.length === 0 && <p className="py-10 text-muted">Nothing here yet. Try another category.</p>}
         </div>
       </section>
 
+      <section className="mt-8">
+        <SectionTitle
+          action={
+            <button onClick={surprise} disabled={rolling} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-accent disabled:opacity-50">
+              <IconDice className={rolling ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+              Surprise me
+            </button>
+          }
+        >
+          On the map
+        </SectionTitle>
+        <div className="card mt-3 overflow-hidden">
+          <MapView places={mapPlaces ?? list?.slice(0, 16) ?? []} center={center} onAreaChange={loadArea} loading={mapLoading} className="h-[320px] w-full" />
+        </div>
+      </section>
+
       {viewed.length > 0 && (
-        <section className="mt-7">
-          <h2 className="px-5 font-display text-[28px]">Recently viewed</h2>
-          <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto px-5">
+        <section className="mt-8">
+          <SectionTitle>Recently viewed</SectionTitle>
+          <div className="no-scrollbar -mx-4 mt-3 flex gap-3 overflow-x-auto px-4">
             {viewed.map((v) => (
-              <Link key={v.id} href={`/place/${v.id}`} className="w-[120px] shrink-0">
-                <Photo src={v.photo} alt={v.name} className="h-[120px] w-[120px] rounded-2xl" />
-                <div className="mt-1.5 truncate text-[13px] font-medium">{v.name}</div>
-                <div className="truncate text-[11px] text-muted">{v.type}</div>
+              <Link key={v.id} href={`/place/${v.id}`} className="w-[116px] shrink-0">
+                <Photo src={v.photo} alt={v.name} className="aspect-square w-full rounded-2xl" />
+                <div className="mt-2 truncate text-[14px] font-semibold">{v.name}</div>
+                <div className="truncate text-[12px] text-muted">{v.type}</div>
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      <section className="mt-7 px-5">
-        <h2 className="font-display text-[28px]">On the map</h2>
-        <div className="mt-3 overflow-hidden rounded-[26px] border border-line">
-          <MapView places={list ?? []} center={center} className="h-[260px] w-full" />
-        </div>
-      </section>
-
-      {(list === null || rest.length > 0) && (
-        <section className="mt-7 px-3">
-          <h2 className="px-2 font-display text-[28px]">More to explore</h2>
-          <div className="mt-2">{list === null ? [0, 1, 2].map((i) => <RowSkeleton key={i} />) : rest.map((p) => <PlaceRow key={p.id} place={p} center={center} />)}</div>
+      {(list === null || (list?.length ?? 0) > 6) && (
+        <section className="mt-8">
+          <SectionTitle>More around you</SectionTitle>
+          <div className="-mx-2 mt-2">{list === null ? [0, 1, 2].map((i) => <RowSkeleton key={i} />) : list.slice(6, 14).map((p) => <PlaceRow key={p.id} place={p} center={center} />)}</div>
         </section>
       )}
+      <p className="py-10 text-center text-[12px] text-muted">Venue data © OpenStreetMap contributors · Weather by Open-Meteo</p>
     </main>
   );
 }

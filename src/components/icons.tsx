@@ -43,3 +43,12 @@ export const IconDice = ({ className = "h-4 w-4" }: P) => (
 export const IconRoute = ({ className = "h-4 w-4" }: P) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}><circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" /><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7" /></svg>
 );
+export const IconBookmark = ({ className = "h-[18px] w-[18px]", filled }: P) => (
+  <svg viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}><path d="M6 3h12v18l-6-4.5L6 21V3Z" strokeLinejoin="round" /></svg>
+);
+export const IconArrow = ({ className = "h-4 w-4" }: P) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="square" /></svg>
+);
+export const IconMic = ({ className = "h-5 w-5" }: P) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className}><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" /></svg>
+);
