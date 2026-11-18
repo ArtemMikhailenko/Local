@@ -233,6 +233,9 @@ export function geoapifyTransport(apiKey: string, fetchImpl: typeof fetch = fetc
       else if (c.includes("museum")) tags.tourism = "museum";
       else if (c.includes("gallery")) tags.tourism = "gallery";
     }
+    // Many venues have no addr:* tags; Geoapify fills street and house number from nearby data.
+    if (!tags["addr:street"] && typeof p.street === "string") tags["addr:street"] = p.street;
+    if (!tags["addr:housenumber"] && (typeof p.housenumber === "string" || typeof p.housenumber === "number")) tags["addr:housenumber"] = String(p.housenumber);
     return { id: `osm_${osmType}_${String(raw.osm_id).replace(/^-/, "")}`, lat: p.lat, lng: p.lon, tags };
   };
   const area: FetchArea = async (c, r) => {

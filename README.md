@@ -1,20 +1,108 @@
-# Locali — AI concierge for places nearby
+# Locali: AI concierge for places nearby
 
-A mobile web take on Google Maps / TripAdvisor discovery, rebuilt around one new idea: **describe the evening you want, and an AI concierge finds 3 real places that fit**. It checks what is open, how far it is, the price and the reviews, then explains each pick.
+**Live:** https://local-jade-delta.vercel.app (open it on a phone, or use a phone-sized window)
 
-Built as a mobile-first web app (Next.js 15, App Router). Works in any phone browser; on desktop it renders as a phone-width column.
+Locali is a mobile web app for finding cafés, restaurants, bars and things to do nearby. The new idea on top of the usual "search and map": **tell the concierge Lumi what kind of evening you want, and it finds real open places that fit**, or builds a timed plan for the whole evening. Then you can let friends vote on the options or turn the pick into an event they can join.
+
+## It works as a web app (PWA)
+
+Locali is a Progressive Web App, so it installs on a phone without an app store:
+
+- **iPhone (Safari):** Share → *Add to Home Screen*. **Android (Chrome):** menu → *Install app*.
+- It opens full-screen from its own icon, without the browser bar, like a native app.
+- On Android, long-press the icon for shortcuts: *Ask the concierge*, *Saved places*.
+- Layout respects the notch and the home indicator (safe areas), portrait orientation, 16 px inputs so iOS does not zoom.
+- On desktop it renders as a phone-width column.
+
+Data is live (places, weather, the concierge), so the app needs a connection; there is no offline mode.
 
 ## Pages (5)
 
 | Page | What you can do |
 | --- | --- |
-| **Discover** `/` | Categories, top places nearby as swipeable cards, live map with rating pins, quick concierge prompts |
-| **Search** `/search` | Debounced text search with *Open now* and price filters, recent searches, browse grid |
-| **Place** `/place/[id]` | Photo gallery, rating, walking time, open status, directions / website / call, hours (today highlighted), reviews, mini-map, "find places like this" |
-| **Concierge** `/concierge` (new feature) | Chat-style AI concierge with live progress ("Searched “wine bar” · 6 found"), 1–3 picks with reasons and tips, or a **timed evening plan** (19:00 dinner → 21:15 bar, 6 min walk) checked against opening hours. **Voice input**, weather-aware picks, **"Let friends vote"** (shareable live poll, no account needed), walking route through all stops, one-tap refinements |
-| **Saved** `/saved` | Private list and map of saved places, profile, sign out. Sign-in / sign-up is a bottom sheet available everywhere |
+| **Discover** `/` | Pick your location (remembered), categories, best places nearby as photo cards, weather chip, recently viewed, "Surprise me". Full-screen map: drag to load any area, tap a pin to preview, filter by category or by **public events** |
+| **Search** `/search` | Text search with *Open now* and price filters, recent searches, category grid |
+| **Place** `/place/[id]` | Photos, rating, walking time, open status, hours (today highlighted), reviews, mini-map. **Route** opens Google Maps with the venue by name (walking, or transit when far). Save, share, add to a group vote, **create an event** |
+| **Lumi (concierge)** `/concierge` | The new feature, see below. Chat history is kept and synced to the account |
+| **Saved** `/saved` | Profile, saved places on a map with notes and a walk through all of them, **votes and events** (yours and the ones you answered), **conversations** with Lumi |
 
-Also: "Surprise me" (random well-rated place open now), weather chip, recently viewed, private notes on saved places, share sheet, installable PWA.
+UI in Ukrainian and English (auto-detected, switchable).
+
+## The new feature: Lumi and plans with friends
+
+1. **Ask in plain words:** "dinner with my parents, they like fish", "date for 4 hours, cocktails at the end". Voice input works too.
+2. Lumi searches, checks opening hours, distance, price and reviews, and answers with **1-3 picks with reasons**, or a **timed evening plan** (19:00 dinner → 21:15 bar, 6 min walk) that is checked against opening hours and walking time.
+3. **Let friends vote:** any set of places (from Lumi or added by hand from any place page) becomes a live poll link. No sign-up needed to vote; link previews in Telegram/Viber show the options and a photo.
+4. **Events:** turn a place or the vote winner into an event with date, time and a note. Friends answer *going / maybe / can't* and add it to their calendar (.ics).
+   - **Private** (default): only people with the link see it.
+   - **Public:** shown to everyone nearby on the map (Events filter, dark date pins). Publishing needs an account.
+
+## External APIs
+
+| Service | Used for | Key |
+| --- | --- | --- |
+| **Google Places API (New)** | Main source: search, details, ratings, reviews, photos | server-side |
+| **OpenStreetMap** via Geoapify (or Overpass) | Automatic fallback when Google fails or is out of quota; areas cached in Postgres for 24 h | server-side |
+| **Google Street View Static** | Street photo of the venue entrance when the venue has no photo of its own | server-side |
+| **Gemini API** (default) / **Claude API** | Concierge, behind one provider-neutral interface (`src/lib/llm`) | server-side |
+| **Open-Meteo** | Weather on Discover and as context for Lumi (rain → indoors, warm → terraces) | none |
+| **MapLibre + OpenFreeMap** | Vector map tiles | none |
+
+All provider responses are normalised into one `Place` type, so the UI and the agent never depend on a specific provider.
+
+**Photos, cheapest first.** Venue's own photo (from its website's preview image, or Google) → Street View of the entrance → a category photo labelled as illustrative. The venue photo always stays first, so it comes back as soon as the Google quota resets.
+
+**Cost control.** Field masks request only what the UI shows; Google photos are capped at 3 per place and cached for a day; Street View panorama lookups are free and stored in the database, images are cached by the CDN for a week, and a daily counter stops at 300 images, below the free monthly tier.
+
+## Lumi, the agent
+
+`src/lib/concierge/agent.ts` runs a tool-use loop with four tools: `search_places` (several in parallel, with an optional area like "Podil"), `get_place_details`, `present_picks`, `present_plan`.
+
+Guardrails:
+- **No invented places.** Every place in the answer must have come back from a tool call in this run (`validatePicks`); otherwise the model gets an error and has to fix it.
+- **Realistic plans.** `validatePlan` checks opening hours at each stop's time, no overlaps, and walking legs of 25 minutes or less.
+- **Never a dead end.** Gemini models are ranked fastest first, each call has a 12 s limit, a model that times out or hits its quota rests for 10 minutes, and the whole run has a deadline. If the model still runs out of time, the best places already found are shown instead of an error.
+- Tool inputs are validated with Zod; bad input goes back to the model as a tool error.
+
+## Security and user data
+
+- **Passwords:** scrypt with a per-user salt, constant-time comparison, same work for unknown emails (no account enumeration).
+- **Sessions:** random 256-bit token in an `httpOnly`, `SameSite=Lax`, `Secure` cookie. Only its SHA-256 is stored, so a database leak does not expose live sessions.
+- **Authorization:** saved places, chats and owned events are always scoped by the session user. Place data is fetched on the server, never trusted from the client.
+- **Votes and RSVPs** without an account use an anonymous random `httpOnly` cookie, one answer per browser. Private events and polls are never listed; only their random link opens them.
+- **CSRF:** SameSite cookies plus an Origin check on every write.
+- **Secrets** stay on the server. The Google photo and Street View endpoints proxy images, so keys never reach the browser. The photo proxy accepts only Google photo references and the website-photo fetcher blocks private network addresses (SSRF).
+- **Rate limits** on sign-in, concierge, votes, events, geocoding and photo endpoints; input validation with Zod on every route.
+
+## Tests
+
+77 unit tests (Vitest) in `tests/`:
+
+| File | What it covers |
+| --- | --- |
+| `auth` | hashing, sessions, cookie handling |
+| `concierge` | agent loop, `validatePicks`, `validatePlan`, deadline and best-effort fallback, model fallback |
+| `places`, `osm` | Google and OSM normalisation, opening-hours parsing, Google → OSM fallback, distance filter, Geoapify mapping |
+| `site-photo` | finding a venue's photo on its website, SSRF protection |
+| `features` | polls, events, `.ics` export, routes (walking vs transit, named destinations) |
+| `public-events` | which public events show on the map (time window, radius, order) |
+| `street-view` | camera heading towards the venue, cache keys, pano id validation |
+| `http-and-limits`, `i18n` | rate limiter, Origin check (CSRF), language detection and translations |
+
+They focus on the logic where a bug would mislead the user or leak data: the agent's guardrails, opening hours, auth, and what is public versus private.
+
+```bash
+npm test               # unit tests
+npm run test:coverage
+npm run typecheck
+npm run lint
+```
+
+## How AI agents were used and checked
+
+- **Claude Code** wrote most of the code from my specs and feedback, one feature at a time, with typecheck, lint and tests after each change.
+- A separate **review agent** read the code without seeing my reasoning and reported 10 problems (security, edge cases, error handling); all were fixed and covered by tests.
+- **Checks beyond tests:** every visible change was opened in a phone-sized browser locally and again on production after deploy; API endpoints were checked with real requests; problems I hit while using the app on my phone (slow concierge answers, a 299-minute walking leg, missing photos, share links) became fixes plus tests.
 
 ## Run locally
 
@@ -30,77 +118,21 @@ npm run dev                    # http://localhost:3000
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | Postgres connection string (Neon / Vercel Postgres in production) |
-| `GEMINI_API_KEY` | for the concierge | Free key from aistudio.google.com. Models are auto-detected (newest Flash, falling back to Flash-Lite on quota) or set `GEMINI_MODELS` |
-| `ANTHROPIC_API_KEY` | alternative | Use Claude instead of Gemini (`CONCIERGE_MODEL`, default `claude-opus-5-5`) |
-| `GEOAPIFY_API_KEY` | recommended | Free key (no card). Fast access to OpenStreetMap venues. Without it the public Overpass API is used (first load of an area can take ~30 s, then cached in Postgres for 24 h) |
-| `GOOGLE_PLACES_API_KEY` | optional | Google Places (ratings, real photos). Takes priority when set |
-| `PLACES_PROVIDER=demo` | optional | Offline mode on 20 fictional Kyiv venues |
+| `DATABASE_URL` | yes | Postgres (Neon in production). Migrations also run on every Vercel build |
+| `GEMINI_API_KEY` | for Lumi | Free key from aistudio.google.com; models are auto-detected, or set `GEMINI_MODELS` |
+| `ANTHROPIC_API_KEY` | alternative | Claude instead of Gemini (`CONCIERGE_MODEL`) |
+| `GOOGLE_PLACES_API_KEY` | recommended | Google Places, and Street View photos if that API is enabled on the key |
+| `GEOAPIFY_API_KEY` | recommended | Fast OpenStreetMap fallback (free, no card). Without it the public Overpass API is used |
+| `STREETVIEW_DAILY_LIMIT` | optional | Street View images per day, default 300 |
+| `PLACES_PROVIDER=demo` | optional | Offline mode with 20 fictional Kyiv venues |
 
-Tests and checks:
+## Time and limitations
 
-```bash
-npm test              # unit tests (Vitest)
-npm run test:coverage
-npm run typecheck
-npm run lint
-```
+About 8 hours of work in one day (see the git history).
 
-## Architecture
-
-```
-src/
-  app/                 pages + API route handlers
-    api/auth/*         signup, login, logout
-    api/places/*       search + details (provider-agnostic)
-    api/photo          Google photo proxy (keeps the key server-side)
-    api/saved          per-user saved places
-    api/concierge      streams NDJSON events from the agent
-  lib/
-    places/            Place model, Google Places adapter, demo provider, TTL cache
-    concierge/         agent loop (Claude tool use) + picks validation
-    auth/              scrypt hashing, session tokens, cookie handling
-    db/                Drizzle schema (users, sessions, saved_places, concierge_runs)
-  components/          UI: cards, rows, map (MapLibre + OpenFreeMap), tab bar, auth sheet
-tests/                 Vitest unit tests
-```
-
-### External API integration
-
-- **OpenStreetMap** venues (default) via Geoapify or Overpass: names, cuisine, opening hours (parsed with `opening_hours` to compute "open now" and to validate evening plans), website, phone, diet and facility tags. OSM has no photos or ratings, so cards use category photos labelled "Illustrative photo".
-- **Open-Meteo** weather (no key): shown on Discover and passed to the concierge (rain or cold → indoor places, nice → terraces).
-- **Gemini API** (default) or **Claude API** for the concierge, behind one provider-neutral interface (`src/lib/llm`).
-- **Google Places API (New)**: `places:searchText` with location bias, `openNow` and price filters; `places/{id}` for details. Field masks request only what the UI shows (cost control). Responses are normalized into one `Place` type, so the UI and the agent never see provider-specific shapes. A 10-minute in-memory cache keeps quota use low.
-- **OpenFreeMap** vector tiles rendered with MapLibre GL (no key needed).
-
-### The concierge agent
-
-`src/lib/concierge/agent.ts` runs a manual tool-use loop with three tools:
-
-1. `search_places(query, open_now?, max_price?, radius_m?)`: the model can call it several times in parallel ("wine bar" + "rooftop bar").
-2. `get_place_details(place_id)`: hours and reviews when they matter.
-3. `present_picks(intro, picks[])`: strict-schema final answer.
-
-Guardrails:
-- **No hallucinated venues.** Every `place_id` in `present_picks` must have come back from a tool call in this run, otherwise the call is returned to the model as an error and it has to fix it (`validatePicks`).
-- Tool inputs are validated with Zod before execution; bad input becomes an `is_error` tool result, not a crash.
-- Hard cap on turns, refusal handling, server-side fallback model on refusals.
-- Stable system prompt with prompt caching; volatile context (time, location, saved places, earlier requests) goes in the user message.
-- The user's saved places are passed as a taste signal, so picks get more personal over time.
-
-## Security and user data
-
-- Passwords: scrypt (N=16384) with a random salt per user, constant-time comparison, and the same work for unknown emails so response time does not reveal which accounts exist.
-- Sessions: 256-bit random token in an `httpOnly`, `SameSite=Lax`, `Secure` (prod) cookie. **Only its SHA-256 is stored**, so a database leak does not expose live sessions. Logout deletes the session row.
-- Authorization: every saved-places query is scoped by the session user id; place snapshots are fetched server-side, never trusted from the client.
-- CSRF: SameSite cookie plus an Origin check on every state-changing route.
-- Secrets: API keys live only on the server. Photos are proxied (`/api/photo`) with a strict `places/{id}/photos/{id}` pattern, so the endpoint cannot be used to fetch arbitrary URLs (SSRF).
-- Rate limits on auth (10/min/IP) and concierge (8/min per user or IP).
-- Input validation with Zod on every API route.
-
-## Known limitations
-
-- Rate limiter and response cache are in-memory per serverless instance; production would use Redis/Upstash.
-- Google Places free usage is limited per month; photos are the most expensive call.
+- Rate limits and the short response cache are in memory per serverless instance; production at scale would use Redis.
+- Google Places has a monthly free quota; when photos run out, venues fall back to Street View and category photos.
+- OpenStreetMap venues have no ratings or reviews.
 - No email verification or password reset.
-- Concierge answers take several seconds because the model calls tools before answering; progress is streamed so the wait is visible.
+- Public events have no moderation or reporting yet (an account is required to publish).
+- Lumi's answers take a few seconds while it searches; progress is shown step by step.

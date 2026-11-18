@@ -30,7 +30,8 @@ function cached(inner: PlacesProvider, ttlMs = 10 * 60_000): PlacesProvider {
 /** Postgres-backed area cache (24 h) in front of the network fetch. */
 function withDbCache(fetchArea: FetchArea): FetchArea {
   return async (center: LatLng, radiusM: number) => {
-    const cell = `${center.lat.toFixed(2)},${center.lng.toFixed(2)},${radiusM}`;
+    // "v2": bump when the stored venue shape changes (v2 adds Geoapify street addresses).
+    const cell = `v2:${center.lat.toFixed(2)},${center.lng.toFixed(2)},${radiusM}`;
     try {
       const [row] = await db.select().from(schema.areaCache).where(eq(schema.areaCache.cell, cell)).limit(1);
       if (row && Date.now() - row.fetchedAt.getTime() < 24 * 60 * 60_000) return row.venues as OsmVenue[];

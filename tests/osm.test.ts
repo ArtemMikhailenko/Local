@@ -93,4 +93,13 @@ describe("Geoapify transport", () => {
     expect(venues).toEqual([{ id: "osm_node_42", lat: 50.46, lng: 30.51, tags: { osm_id: "42", osm_type: "n", opening_hours: "Mo-Su 08:00-20:00", name: "Kava", amenity: "cafe" } }]);
     expect(String(fetchMock.mock.calls[0][0])).toContain("filter=circle:30.5155,50.4651,2000");
   });
+
+  it("fills a missing address from Geoapify so routes can name the venue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ features: [{ properties: { name: "Lemongrass", lat: 50.46, lon: 30.51, street: "Межигірська вулиця", housenumber: "3", datasource: { raw: { osm_id: 7, osm_type: "n" } } } }] })),
+    );
+    const [v] = await geoapifyTransport("KEY", fetchMock as unknown as typeof fetch).area(KYIV, 2000);
+    expect(v.tags["addr:street"]).toBe("Межигірська вулиця");
+    expect(normalizeOsm(v, new Date(), "Europe/Kyiv").address).toBe("Межигірська вулиця, 3");
+  });
 });
