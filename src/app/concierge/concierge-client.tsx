@@ -366,7 +366,7 @@ function ConciergeInner() {
           e.preventDefault();
           ask(input);
         }}
-        className="sticky bottom-[78px] z-30 mt-2 pb-2"
+        className="sticky bottom-[92px] z-30 mt-2 pb-2"
       >
         <div className="card flex items-end gap-2 !rounded-[26px] p-1.5 pl-4">
           <textarea
