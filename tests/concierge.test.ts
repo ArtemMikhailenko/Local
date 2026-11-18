@@ -161,7 +161,7 @@ describe("Gemini adapter", () => {
     await expect(s.next()).rejects.toBeInstanceOf(LlmRateLimitError);
   });
 
-  it("ranks discovered models: newest flash first, then flash-lite, skipping previews", () => {
+  it("ranks discovered models: fast flash-lite first (newest first), flash as fallback, skipping previews", () => {
     expect(
       rankGeminiModels([
         "models/gemini-2.5-flash",
@@ -173,7 +173,7 @@ describe("Gemini adapter", () => {
         "models/gemini-3.8-flash-image",
         "models/text-embedding-004",
       ]),
-    ).toEqual(["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]);
+    ).toEqual(["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"]);
   });
 });
 

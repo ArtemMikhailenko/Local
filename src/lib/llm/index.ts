@@ -7,8 +7,8 @@ import { geminiFactory } from "./gemini";
 import type { LlmFactory } from "./types";
 
 /**
- * Picks the stable text models available to this key, newest first: the best "flash" model,
- * then "flash-lite" models (much higher free-tier daily quota) as fallbacks.
+ * Picks stable text models for this key. Flash-Lite first (fast, much higher free-tier quota,
+ * plenty for tool calling), newest first; the best Flash model last as a fallback.
  */
 export function rankGeminiModels(names: string[]): string[] {
   const version = (n: string) => Number(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0);
@@ -17,7 +17,7 @@ export function rankGeminiModels(names: string[]): string[] {
     .filter((n) => /^gemini-\d+(\.\d+)?-flash(-lite)?$/.test(n)); // skips preview/image/tts/live variants
   const flash = ok.filter((n) => !n.endsWith("-lite")).sort((a, b) => version(b) - version(a));
   const lite = ok.filter((n) => n.endsWith("-lite")).sort((a, b) => version(b) - version(a));
-  return [...flash.slice(0, 1), ...lite.slice(0, 2)];
+  return [...lite.slice(0, 2), ...flash.slice(0, 1)];
 }
 
 let geminiModels: Promise<string[]> | null = null;

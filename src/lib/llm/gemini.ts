@@ -1,7 +1,10 @@
 import { ApiError, ThinkingLevel, type Content, type GenerateContentResponse, type GoogleGenAI } from "@google/genai";
 import { LlmRateLimitError, type LlmFactory, type LlmSession, type ToolCall } from "./types";
 
-const PER_CALL_MS = 15_000;
+const PER_CALL_MS = 12_000;
+/** Models that timed out or hit quota recently are skipped for a while (shared per server instance). */
+const cooling = new Map<string, number>();
+const COOL_MS = 10 * 60_000;
 
 type GenerateFn = (req: Parameters<GoogleGenAI["models"]["generateContent"]>[0]) => Promise<GenerateContentResponse>;
 
@@ -19,11 +22,12 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
       async next() {
         let res: GenerateContentResponse | undefined;
         let usedModel = models[0];
-        for (let i = 0; i < models.length; i++) {
+        const order = [...models.filter((m) => (cooling.get(m) ?? 0) < Date.now()), ...models.filter((m) => (cooling.get(m) ?? 0) >= Date.now())];
+        for (let i = 0; i < order.length; i++) {
           try {
-            usedModel = models[i];
+            usedModel = order[i];
             res = await generate({
-              model: models[i],
+              model: order[i],
               contents: [...contents],
               config: {
                 systemInstruction: system,
@@ -31,8 +35,8 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
                 temperature: 0.6,
                 // Per-call cap: a stuck model must not eat the whole run; on timeout we try the next model.
                 abortSignal: signal ? AbortSignal.any([signal, AbortSignal.timeout(PER_CALL_MS)]) : AbortSignal.timeout(PER_CALL_MS),
-                // Gemini 3+ thinks by default; for a snappy concierge keep it low.
-                ...(Number(models[i].match(/gemini-(\d+)/)?.[1] ?? 0) >= 3 ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+                // Gemini 3+ thinks by default; tool routing needs little of it, so keep it minimal for speed.
+                ...(Number(order[i].match(/gemini-(\d+)/)?.[1] ?? 0) >= 3 ? { thinkingConfig: { thinkingLevel: order[i].endsWith("-lite") ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW } } : {}),
               },
             });
             break;
@@ -41,8 +45,9 @@ export function geminiFactory(generate: GenerateFn, models: string[]): LlmFactor
             const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
             const quota = timedOut || (err instanceof ApiError && (err.status === 429 || err.status === 500 || err.status === 503));
             if (!quota) throw err;
-            console.warn(`gemini ${models[i]} quota/unavailable, trying next`);
-            if (i === models.length - 1) throw new LlmRateLimitError("All Gemini models are rate limited");
+            cooling.set(order[i], Date.now() + COOL_MS);
+            console.warn(`gemini ${order[i]} timed out or unavailable, trying next`);
+            if (i === order.length - 1) throw new LlmRateLimitError("All Gemini models are rate limited");
           }
         }
         const candidate = res!.candidates?.[0];
