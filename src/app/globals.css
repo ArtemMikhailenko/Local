@@ -1,26 +1,88 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0b0b0f;
+  --surface: #14141b;
+  --surface-2: #1c1c25;
+  --line: rgba(255, 255, 255, 0.08);
+  --text: #f5f2ec;
+  --muted: #9b98a6;
+  --accent: #ff8a4c;
+  --accent-soft: rgba(255, 138, 76, 0.14);
+  --ai: #b6a4ff;
+  --ai-soft: rgba(182, 164, 255, 0.14);
+  --good: #6fdc9b;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-ai: var(--ai);
+  --color-good: var(--good);
+  --font-sans: var(--font-geist);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+* { -webkit-tap-highlight-color: transparent; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(900px 600px at 15% -10%, rgba(255, 138, 76, 0.16), transparent 60%),
+    radial-gradient(800px 600px at 110% 10%, rgba(182, 164, 255, 0.14), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-geist), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display { font-family: var(--font-serif), Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+.glass {
+  background: rgba(20, 20, 27, 0.72);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--line);
+}
+
+.orb {
+  background: conic-gradient(from 180deg, #ff8a4c, #ffb36b, #b6a4ff, #7c6cff, #ff8a4c);
+  box-shadow: 0 0 32px rgba(182, 164, 255, 0.45), 0 0 12px rgba(255, 138, 76, 0.35);
+}
+.orb-spin { animation: spin 6s linear infinite; }
+.orb-pulse { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { transform: scale(0.9); opacity: 0.75; } }
+
+.fade-up { animation: fadeUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.shimmer {
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.text-gradient {
+  background: linear-gradient(90deg, #ffc48a, #ff8a4c 40%, #b6a4ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sheet-in { animation: sheetIn 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
+
+.maplibregl-ctrl-attrib { font-size: 9px; background: rgba(11, 11, 15, 0.6) !important; }
+.maplibregl-ctrl-attrib a { color: var(--muted) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }

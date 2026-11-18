@@ -1,103 +1,179 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import clsx from "clsx";
+import { useApp } from "@/components/app-provider";
+import { IconDice, IconPin, IconSparkle } from "@/components/icons";
+import { MapView } from "@/components/map-view";
+import { Photo, PlaceCard, PlaceRow, RowSkeleton } from "@/components/place-bits";
+import { readViewed, haptic, type RecentItem } from "@/lib/client/extras";
+import { api } from "@/lib/client/api";
+import { CATEGORIES, type Place } from "@/lib/places/types";
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 5) return "Late night";
+  if (h < 12) return "Good morning";
+  if (h < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+const PROMPTS = ["Romantic dinner, not too pricey", "Rainy day with kids", "Laptop-friendly coffee", "Sunset drinks for 4"];
+
+export default function Discover() {
+  const { user, center, locationLabel, mode, ready } = useApp();
+  const [cat, setCat] = useState<(typeof CATEGORIES)[number]>(CATEGORIES[2]);
+  const [list, setList] = useState<Place[] | null>(null);
+  const [viewed, setViewed] = useState<RecentItem[]>([]);
+  const [rolling, setRolling] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => setViewed(readViewed()), []);
+
+  /** "Surprise me": a random well-rated place that is open right now, from a random category. */
+  async function surprise() {
+    setRolling(true);
+    haptic(20);
+    try {
+      const c = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+      const { results } = await api.search(c.query, center.lat, center.lng, { open: true });
+      const good = results.filter((p) => (p.rating ?? 0) >= 4.4);
+      const pool = good.length ? good : results;
+      if (pool.length) router.push(`/place/${pool[Math.floor(Math.random() * pool.length)].id}`);
+    } finally {
+      setRolling(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!ready) return;
+    let alive = true;
+    setList(null);
+    api
+      .search(cat.query, center.lat, center.lng)
+      .then((r) => alive && setList(r.results))
+      .catch(() => alive && setList([]));
+    return () => {
+      alive = false;
+    };
+  }, [cat, center, ready]);
+
+  const top = list?.slice(0, 5) ?? [];
+  const rest = list?.slice(5, 11) ?? [];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <main className="pt-[max(env(safe-area-inset-top),20px)]">
+      <header className="flex items-center justify-between px-5">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1.5 text-[13px]">
+          <IconPin className="h-3.5 w-3.5 text-accent" />
+          {locationLabel}
+          {mode === "demo" && <span className="ml-1 rounded-full bg-ai/15 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-ai">demo</span>}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link href="/saved" className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 text-sm font-semibold">
+          {user ? user.name[0]?.toUpperCase() : "·"}
+        </Link>
+      </header>
+
+      <section className="fade-up px-5 pt-7">
+        <p className="text-sm text-muted">
+          {greeting()}
+          {user ? `, ${user.name.split(" ")[0]}` : ""}
+        </p>
+        <h1 className="mt-1 font-display text-[44px] leading-[0.98]">
+          Where to <span className="italic text-gradient">tonight?</span>
+        </h1>
+        <button
+          onClick={surprise}
+          disabled={rolling}
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-4 py-2 text-sm font-medium transition hover:bg-surface-2 active:scale-95 disabled:opacity-60"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <IconDice className={rolling ? "h-4 w-4 animate-spin text-accent" : "h-4 w-4 text-accent"} />
+          {rolling ? "Rolling…" : "Surprise me, something open now"}
+        </button>
+      </section>
+
+      <section className="px-5 pt-5">
+        <div className="group relative overflow-hidden rounded-[28px] border border-line bg-surface p-5">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-ai/25 blur-3xl transition group-hover:bg-ai/35" />
+          <Link href="/concierge" className="flex items-center gap-3">
+            <span className="orb orb-spin h-9 w-9 rounded-full" />
+            <div>
+              <div className="font-semibold">Ask the concierge</div>
+              <div className="text-[13px] text-muted">Describe the vibe, get 3 hand-picked places</div>
+            </div>
+          </Link>
+          <div className="no-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5">
+            {PROMPTS.map((p) => (
+              <Link key={p} href={`/concierge?q=${encodeURIComponent(p)}`} className="shrink-0 rounded-full border border-ai/25 bg-ai/10 px-3 py-1.5 text-[13px] text-ai transition hover:bg-ai/20">
+                <IconSparkle className="mr-1 inline h-3 w-3" />
+                {p}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <nav className="no-scrollbar mt-6 flex gap-2 overflow-x-auto px-5">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => setCat(c)}
+            className={clsx(
+              "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition",
+              c.key === cat.key ? "bg-text text-black" : "border border-line bg-surface/60 text-text/80 hover:bg-surface-2",
+            )}
+          >
+            <span className="mr-1.5">{c.emoji}</span>
+            {c.label}
+          </button>
+        ))}
+      </nav>
+
+      <section className="mt-5">
+        <div className="flex items-baseline justify-between px-5">
+          <h2 className="font-display text-[28px]">Top {cat.label.toLowerCase()} nearby</h2>
+          <Link href={`/search?q=${encodeURIComponent(cat.query)}`} className="text-sm text-muted hover:text-text">
+            See all
+          </Link>
+        </div>
+        <div className="no-scrollbar mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-5 px-5 pb-1">
+          {list === null
+            ? [0, 1].map((i) => <div key={i} className="shimmer h-[300px] w-[260px] shrink-0 rounded-[26px]" />)
+            : top.map((p) => <PlaceCard key={p.id} place={p} center={center} />)}
+          {list?.length === 0 && <p className="py-10 text-muted">Nothing here yet. Try another category.</p>}
+        </div>
+      </section>
+
+      {viewed.length > 0 && (
+        <section className="mt-7">
+          <h2 className="px-5 font-display text-[28px]">Recently viewed</h2>
+          <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto px-5">
+            {viewed.map((v) => (
+              <Link key={v.id} href={`/place/${v.id}`} className="w-[120px] shrink-0">
+                <Photo src={v.photo} alt={v.name} className="h-[120px] w-[120px] rounded-2xl" />
+                <div className="mt-1.5 truncate text-[13px] font-medium">{v.name}</div>
+                <div className="truncate text-[11px] text-muted">{v.type}</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="mt-7 px-5">
+        <h2 className="font-display text-[28px]">On the map</h2>
+        <div className="mt-3 overflow-hidden rounded-[26px] border border-line">
+          <MapView places={list ?? []} center={center} className="h-[260px] w-full" />
+        </div>
+      </section>
+
+      {(list === null || rest.length > 0) && (
+        <section className="mt-7 px-3">
+          <h2 className="px-2 font-display text-[28px]">More to explore</h2>
+          <div className="mt-2">{list === null ? [0, 1, 2].map((i) => <RowSkeleton key={i} />) : rest.map((p) => <PlaceRow key={p.id} place={p} center={center} />)}</div>
+        </section>
+      )}
+    </main>
   );
 }
