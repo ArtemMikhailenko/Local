@@ -76,7 +76,7 @@ Guardrails:
 
 ## Tests
 
-82 unit tests (Vitest) in `tests/`:
+84 unit tests (Vitest) in `tests/`:
 
 | File | What it covers |
 | --- | --- |
@@ -132,7 +132,7 @@ About 8 hours of work in one day (see the git history).
 
 - Rate limits and the short response cache are in memory per serverless instance; production at scale would use Redis.
 - Google Places has a monthly free quota; when photos run out, venues fall back to Street View and illustrated tiles.
-- **Demo shortcut:** Google venue photos are copied into our database on first view (`photo_files`, 900 px, capped at 3,500 files) and served from there afterwards, so each photo costs one Places request ever. Google's terms do not allow storing their photos, so a production build would delete this table and pay per photo view instead.
+- **Demo shortcut:** Google venue photos are copied into our database on first view (`photo_files`, re-encoded to WebP at 900 px / quality 80, about 60 KB each, capped at 6,000 files) and served from there afterwards, so each photo costs one Places request ever. Google's terms do not allow storing their photos, so a production build would delete this table and pay per photo view instead.
 - OpenStreetMap venues have no ratings or reviews.
 - No email verification or password reset.
 - Public events have no moderation or reporting yet (an account is required to publish).

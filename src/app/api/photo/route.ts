@@ -1,11 +1,12 @@
+import sharp from "sharp";
 import { count, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { env } from "@/lib/env";
 import { PHOTO_REF_RE } from "@/lib/places/google";
 
 const URI_KEEP_MS = 3 * 24 * 60 * 60_000;
-const MAX_BYTES = 450_000; // one photo
-const MAX_FILES = 3_500; // keeps the table well inside the free Neon storage
+const MAX_BYTES = 1_500_000; // downloaded original, before compression
+const MAX_FILES = 6_000; // ~60 KB each as WebP: well inside the free Neon storage
 
 const image = (data: Buffer, mime: string) =>
   new Response(new Uint8Array(data), { headers: { "Content-Type": mime, "Cache-Control": "public, max-age=2592000, s-maxage=2592000, immutable" } });
@@ -20,6 +21,19 @@ async function download(uri: string): Promise<{ data: Buffer; mime: string } | n
     return data.length && data.length <= MAX_BYTES ? { data, mime } : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Re-encode for storage: at most 900 px wide, WebP quality 80 (visually close to the original,
+ * usually half the size of Google's JPEG). Falls back to the original bytes if encoding fails.
+ */
+export async function compress(file: { data: Buffer; mime: string }): Promise<{ data: Buffer; mime: string }> {
+  try {
+    const data = await sharp(file.data).rotate().resize({ width: 900, withoutEnlargement: true }).webp({ quality: 80, effort: 4 }).toBuffer();
+    return data.length < file.data.length ? { data, mime: "image/webp" } : file;
+  } catch {
+    return file;
   }
 }
 
@@ -72,7 +86,8 @@ export async function GET(req: Request) {
   if (!uri) return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
 
   // 3. Copy the file, then serve it.
-  const file = await download(uri);
+  const original = await download(uri);
+  const file = original && (await compress(original));
   if (!file) return new Response(null, { status: 302, headers: { Location: uri, "Cache-Control": "no-store" } });
   try {
     const [{ n }] = await db.select({ n: count() }).from(schema.photoFiles);
